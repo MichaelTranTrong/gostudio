@@ -106,11 +106,38 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 
 ---
 
+## Đã làm (tiếp theo)
+
+### 8. v1.1.0 — Xóa lịch sử
+- Nút **✕** trên mỗi dòng → xóa từng job (`DELETE /api/jobs/:id`)
+- Nút **Xóa toàn bộ** → xóa hết + reset `AUTO_INCREMENT` về 1 (`DELETE /api/jobs`)
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.0
+
+### 9. Lệnh release GitHub
+```bash
+git add .
+git commit -m "message"
+git tag v1.x.x
+git push origin main
+git push origin v1.x.x
+gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
+```
+
+### 10. Lỗi đã gặp và cách xử lý
+| Lỗi | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Dialog chọn file mở 2 lần | `<label for="fileInput">` + `dropZone click` cùng trigger | Đổi `<label>` thành `<span>` |
+| Tên file tải về có dấu `+` thay dấu cách | Gin `FileAttachment` không encode đúng RFC 5987 | Set thủ công header `Content-Disposition` với `filename*=UTF-8''...` |
+| Tên file upload có dấu `+` | Browser encode space thành `+` trong multipart | Dùng `url.QueryUnescape` trước khi lưu |
+| Container DB không start — `file exists` | containerd bị kẹt state cũ | `docker compose down && docker rm -f gostudio-db gostudio-app && docker compose up -d` |
+
+---
+
 ## Đang làm
 
-- Ổn định tính năng MP4 → MP3
-- Repo public trên GitHub: https://github.com/MichaelTranTrong/gostudio
-- Release v1.0.0: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.0.0
+- Ổn định v1.1.0
+- Repo public: https://github.com/MichaelTranTrong/gostudio
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.0
 
 ---
 
@@ -138,3 +165,12 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
+
+---
+
+## Versions
+
+| Version | Nội dung |
+|---|---|
+| v1.0.0 | Chuyển MP4 → MP3, Docker, MySQL, giao diện web dark theme |
+| v1.1.0 | Xóa từng job, xóa toàn bộ lịch sử + reset ID |
