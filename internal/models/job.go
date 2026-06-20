@@ -2,6 +2,7 @@ package models
 
 import (
 	"gostudio/internal/database"
+	"os"
 	"time"
 )
 
@@ -45,17 +46,56 @@ func GetJob(id uint64) (*Job, error) {
 }
 
 func DeleteJob(id uint64) error {
+	var inputFile, outputFile string
+	row := database.DB.QueryRow(`SELECT input_file, COALESCE(output_file,'') FROM jobs WHERE id=?`, id)
+	_ = row.Scan(&inputFile, &outputFile)
+
 	_, err := database.DB.Exec(`DELETE FROM jobs WHERE id=?`, id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if inputFile != "" {
+		os.Remove(inputFile)
+	}
+	if outputFile != "" {
+		os.Remove(outputFile)
+	}
+	return nil
 }
 
 func DeleteAllJobs() error {
-	_, err := database.DB.Exec(`DELETE FROM jobs`)
+	rows, err := database.DB.Query(`SELECT input_file, COALESCE(output_file,'') FROM jobs`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var files [][2]string
+	for rows.Next() {
+		var in, out string
+		if rows.Scan(&in, &out) == nil {
+			files = append(files, [2]string{in, out})
+		}
+	}
+
+	_, err = database.DB.Exec(`DELETE FROM jobs`)
 	if err != nil {
 		return err
 	}
 	_, err = database.DB.Exec(`ALTER TABLE jobs AUTO_INCREMENT = 1`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		if f[0] != "" {
+			os.Remove(f[0])
+		}
+		if f[1] != "" {
+			os.Remove(f[1])
+		}
+	}
+	return nil
 }
 
 func ListJobs() ([]Job, error) {
