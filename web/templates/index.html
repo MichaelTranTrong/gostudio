@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Go Studio</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="logo">🎬 Go Studio</div>
+  <nav>
+    <a href="/" class="active">Chuyển đổi MP4 → MP3</a>
+  </nav>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Chuyển Video MP4 sang Audio MP3</h2>
+    <p class="hint">Tải lên file video MP4, hệ thống sẽ trích xuất phần âm thanh thành MP3.</p>
+
+    <form id="uploadForm" enctype="multipart/form-data">
+      <div class="drop-zone" id="dropZone">
+        <span id="dropLabel">Kéo thả file MP4 vào đây hoặc <span class="browse">chọn file</span></span>
+        <input type="file" id="fileInput" name="file" accept=".mp4,video/mp4" hidden/>
+        <div id="fileName" class="file-name"></div>
+      </div>
+      <button type="submit" id="submitBtn" disabled>Bắt đầu chuyển đổi</button>
+    </form>
+
+    <div id="progress" class="progress hidden">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <p id="statusText">Đang xử lý…</p>
+    </div>
+
+    <div id="result" class="result hidden">
+      <p>✅ Chuyển đổi thành công!</p>
+      <a id="downloadLink" class="btn-download" href="#">Tải xuống MP3</a>
+    </div>
+  </section>
+
+  <section class="card history-card">
+    <h3>Lịch sử chuyển đổi</h3>
+    <table id="jobTable">
+      <thead><tr><th>ID</th><th>File</th><th>Trạng thái</th><th>Thời gian</th><th>Tải về</th></tr></thead>
+      <tbody id="jobBody"></tbody>
+    </table>
+  </section>
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

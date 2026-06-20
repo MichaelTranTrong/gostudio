@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    container_name: gostudio-app
+    ports:
+      - "2005:2005"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: gostudio
+      DB_PASS: gostudio123
+      DB_NAME: gostudio
+    volumes:
+      - uploads_data:/app/uploads
+      - outputs_data:/app/outputs
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    container_name: gostudio-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: gostudio
+      MYSQL_USER: gostudio
+      MYSQL_PASSWORD: gostudio123
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ugostudio", "-pgostudio123"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  uploads_data:
+  outputs_data:
