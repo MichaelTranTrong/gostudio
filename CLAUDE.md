@@ -113,6 +113,11 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Nút **Xóa toàn bộ** → xóa hết + reset `AUTO_INCREMENT` về 1 (`DELETE /api/jobs`)
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.0
 
+### 11. v1.1.1 — Xóa file vật lý khi xóa job
+- Khi xóa job (từng job hoặc toàn bộ), tự động xóa luôn file MP4 trong `uploads/` và file MP3 trong `outputs/`
+- Trước đây chỉ xóa record DB, file vẫn còn trong Docker volume gây chiếm dung lượng disk
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.1
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -135,9 +140,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.1.0
+- Ổn định v1.1.1
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.1
 
 ---
 
@@ -174,3 +179,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 |---|---|
 | v1.0.0 | Chuyển MP4 → MP3, Docker, MySQL, giao diện web dark theme |
 | v1.1.0 | Xóa từng job, xóa toàn bộ lịch sử + reset ID |
+| v1.1.1 | Xóa file vật lý (MP4 + MP3) khi xóa job, tránh chiếm dung lượng disk |
