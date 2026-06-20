@@ -149,4 +149,31 @@ tr:last-child td { border-bottom: none; }
 .dl-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 .dl-link:hover { text-decoration: underline; }
 
+.history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.history-header h3 { margin-bottom: 0; }
+
+.btn-delete-all {
+  padding: 6px 16px;
+  border: 1px solid var(--accent2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent2);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-delete-all:hover { background: var(--accent2); color: #fff; }
+
+.btn-delete-row {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+.btn-delete-row:hover { color: var(--accent2); background: rgba(255,101,132,0.1); }
+
 .hidden { display: none !important; }

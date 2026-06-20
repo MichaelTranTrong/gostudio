@@ -93,6 +93,29 @@ func JobStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, job)
 }
 
+// DeleteJob xóa một job theo id.
+func DeleteJob(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
+		return
+	}
+	if err := models.DeleteJob(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Đã xóa"})
+}
+
+// DeleteAllJobs xóa toàn bộ lịch sử và reset AUTO_INCREMENT.
+func DeleteAllJobs(c *gin.Context) {
+	if err := models.DeleteAllJobs(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Đã xóa toàn bộ lịch sử"})
+}
+
 // JobList returns all jobs.
 func JobList(c *gin.Context) {
 	jobs, err := models.ListJobs()

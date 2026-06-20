@@ -42,6 +42,8 @@ func main() {
 		api.POST("/convert/mp4-to-mp3", handlers.ConvertMP4ToMP3)
 		api.GET("/jobs", handlers.JobList)
 		api.GET("/jobs/:id", handlers.JobStatus)
+		api.DELETE("/jobs/:id", handlers.DeleteJob)
+		api.DELETE("/jobs", handlers.DeleteAllJobs)
 		api.GET("/download/:id", handlers.DownloadOutput)
 	}
 

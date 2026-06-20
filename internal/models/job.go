@@ -44,6 +44,20 @@ func GetJob(id uint64) (*Job, error) {
 	return j, row.Scan(&j.ID, &j.Type, &j.Status, &j.InputFile, &j.OutputFile, &j.ErrorMsg, &j.CreatedAt, &j.UpdatedAt)
 }
 
+func DeleteJob(id uint64) error {
+	_, err := database.DB.Exec(`DELETE FROM jobs WHERE id=?`, id)
+	return err
+}
+
+func DeleteAllJobs() error {
+	_, err := database.DB.Exec(`DELETE FROM jobs`)
+	if err != nil {
+		return err
+	}
+	_, err = database.DB.Exec(`ALTER TABLE jobs AUTO_INCREMENT = 1`)
+	return err
+}
+
 func ListJobs() ([]Job, error) {
 	rows, err := database.DB.Query(
 		`SELECT id, type, status, input_file, COALESCE(output_file,''), COALESCE(error_msg,''), created_at, updated_at FROM jobs ORDER BY id DESC LIMIT 100`,

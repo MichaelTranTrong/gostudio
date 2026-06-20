@@ -40,9 +40,12 @@
   </section>
 
   <section class="card history-card">
-    <h3>Lịch sử chuyển đổi</h3>
+    <div class="history-header">
+      <h3>Lịch sử chuyển đổi</h3>
+      <button id="deleteAllBtn" class="btn-delete-all">Xóa toàn bộ</button>
+    </div>
     <table id="jobTable">
-      <thead><tr><th>ID</th><th>File</th><th>Trạng thái</th><th>Thời gian</th><th>Tải về</th></tr></thead>
+      <thead><tr><th>ID</th><th>File</th><th>Trạng thái</th><th>Thời gian</th><th>Tải về</th><th></th></tr></thead>
       <tbody id="jobBody"></tbody>
     </table>
   </section>

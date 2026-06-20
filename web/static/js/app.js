@@ -7,7 +7,8 @@ const progressFill = document.getElementById('progressFill');
 const statusText = document.getElementById('statusText');
 const resultEl   = document.getElementById('result');
 const downloadLink = document.getElementById('downloadLink');
-const jobBody    = document.getElementById('jobBody');
+const jobBody       = document.getElementById('jobBody');
+const deleteAllBtn  = document.getElementById('deleteAllBtn');
 
 let selectedFile = null;
 
@@ -106,11 +107,26 @@ async function loadHistory() {
         <td><span class="badge badge-${j.status}">${labelStatus(j.status)}</span></td>
         <td>${date}</td>
         <td>${dl}</td>
+        <td><button class="btn-delete-row" title="Xóa" data-id="${j.id}">✕</button></td>
       `;
       jobBody.appendChild(tr);
     });
   } catch {}
 }
+
+jobBody.addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-delete-row');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  await fetch('/api/jobs/' + id, { method: 'DELETE' });
+  loadHistory();
+});
+
+deleteAllBtn.addEventListener('click', async () => {
+  if (!confirm('Xóa toàn bộ lịch sử và reset ID?')) return;
+  await fetch('/api/jobs', { method: 'DELETE' });
+  loadHistory();
+});
 
 function labelStatus(s) {
   return { pending: 'Chờ', processing: 'Đang xử lý', done: 'Hoàn thành', failed: 'Lỗi' }[s] || s;
