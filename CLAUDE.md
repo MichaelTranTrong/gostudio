@@ -118,6 +118,20 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Trước đây chỉ xóa record DB, file vẫn còn trong Docker volume gây chiếm dung lượng disk
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.1
 
+### 12. v1.2.0 — Chữ → Tiếng (TTS) với VieNeu-TTS
+- Tab mới "Chữ → Tiếng": nhập text, chọn giọng, tạo MP3 (offline)
+- Thêm service Python `vieneu` (FastAPI, port 8001 nội bộ) vào Docker Compose
+- Go gọi VieNeu qua HTTP, tự chia text ≤2800 ký tự, ghép audio bằng FFmpeg
+- Lịch sử dùng chung, badge phân biệt MP4 / TTS
+- Model: `pnnbao-ump/VieNeu-TTS-0.3B-ngoc-huyen-gguf-Q4_0` (GGUF, llama-cpp CPU)
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.2.0
+
+### 13. v1.2.1 — Sửa lỗi TTS đọc câu reference + lặp lại
+- Audio TTS đọc cả câu mẫu giọng ("...tính chiến đấu, tính định hướng") và lặp nội dung
+- Nguyên nhân: VieNeu chọn sai `use_chat_format` cho bản fine-tune 0.3B
+- Fix qua `vieneu/fix_stream.py` (chạy lúc build image), xem mục Lỗi đã gặp
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.2.1
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -135,14 +149,17 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Tên file tải về có dấu `+` thay dấu cách | Gin `FileAttachment` không encode đúng RFC 5987 | Set thủ công header `Content-Disposition` với `filename*=UTF-8''...` |
 | Tên file upload có dấu `+` | Browser encode space thành `+` trong multipart | Dùng `url.QueryUnescape` trước khi lưu |
 | Container DB không start — `file exists` | containerd bị kẹt state cũ | `docker compose down && docker rm -f gostudio-db gostudio-app && docker compose up -d` |
+| VieNeu crash khi khởi động — `ModuleNotFoundError: trafilatura` / `llama_cpp` | Minimal install thiếu dependency | Cài thêm `trafilatura` + `llama-cpp-python` (cần `cmake build-essential g++` để compile) trong Dockerfile |
+| VieNeu báo `No file found ... VieNeu-TTS-v2-Q4-K-M.gguf` | Model trên HF đổi tên file GGUF | `sed` đổi filename trong `src/vieneu/standard.py` thành `VieNeu-TTS-0.3B-ngoc-huyen-Q4_0.gguf` |
+| Audio TTS đọc cả câu reference + lặp lại | `use_chat_format` chỉ bật cho repo v1; bản fine-tune 0.3B dùng sai định dạng prompt → đọc ref text + lặp (308 tokens/6s thay vì 74/1.5s) | Đổi heuristic thành `"VieNeu-TTS" in backbone_repo`; dùng `infer()` thay `infer_stream()`. Patch qua `vieneu/fix_stream.py` |
 
 ---
 
 ## Đang làm
 
-- Ổn định v1.1.1
+- Ổn định v1.2.1
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.1.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.2.1
 
 ---
 
@@ -180,3 +197,5 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.0.0 | Chuyển MP4 → MP3, Docker, MySQL, giao diện web dark theme |
 | v1.1.0 | Xóa từng job, xóa toàn bộ lịch sử + reset ID |
 | v1.1.1 | Xóa file vật lý (MP4 + MP3) khi xóa job, tránh chiếm dung lượng disk |
+| v1.2.0 | Chữ → Tiếng (TTS) với VieNeu-TTS, service Python riêng trong Docker |
+| v1.2.1 | Sửa lỗi TTS đọc câu reference + lặp lại (use_chat_format) |
