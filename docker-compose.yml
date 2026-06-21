@@ -10,12 +10,20 @@ services:
       DB_USER: gostudio
       DB_PASS: gostudio123
       DB_NAME: gostudio
+      VIENEU_URL: http://vieneu:8001
     volumes:
       - uploads_data:/app/uploads
       - outputs_data:/app/outputs
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
+
+  vieneu:
+    build: ./vieneu
+    container_name: gostudio-vieneu
+    volumes:
+      - vieneu_cache:/root/.cache
     restart: unless-stopped
 
   db:
@@ -39,3 +47,4 @@ volumes:
   mysql_data:
   uploads_data:
   outputs_data:
+  vieneu_cache:

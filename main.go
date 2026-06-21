@@ -40,6 +40,8 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.POST("/convert/mp4-to-mp3", handlers.ConvertMP4ToMP3)
+		api.POST("/tts", handlers.TextToSpeech)
+		api.GET("/voices", handlers.GetVoices)
 		api.GET("/jobs", handlers.JobList)
 		api.GET("/jobs/:id", handlers.JobStatus)
 		api.DELETE("/jobs/:id", handlers.DeleteJob)

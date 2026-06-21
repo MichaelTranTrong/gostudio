@@ -1,20 +1,32 @@
-const dropZone   = document.getElementById('dropZone');
-const fileInput  = document.getElementById('fileInput');
-const fileNameEl = document.getElementById('fileName');
-const submitBtn  = document.getElementById('submitBtn');
-const progressEl = document.getElementById('progress');
+// ── Tab switching ──────────────────────────────────────────────
+document.querySelectorAll('nav a[data-tab]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const tab = link.dataset.tab;
+    document.querySelectorAll('nav a[data-tab]').forEach(a => a.classList.remove('active'));
+    link.classList.add('active');
+    document.getElementById('tab-mp4').classList.toggle('hidden', tab !== 'mp4');
+    document.getElementById('tab-tts').classList.toggle('hidden', tab !== 'tts');
+    if (tab === 'tts') loadVoices();
+  });
+});
+
+// ── MP4 → MP3 ─────────────────────────────────────────────────
+const dropZone    = document.getElementById('dropZone');
+const fileInput   = document.getElementById('fileInput');
+const fileNameEl  = document.getElementById('fileName');
+const submitBtn   = document.getElementById('submitBtn');
+const progressEl  = document.getElementById('progress');
 const progressFill = document.getElementById('progressFill');
-const statusText = document.getElementById('statusText');
-const resultEl   = document.getElementById('result');
+const statusText  = document.getElementById('statusText');
+const resultEl    = document.getElementById('result');
 const downloadLink = document.getElementById('downloadLink');
-const jobBody       = document.getElementById('jobBody');
-const deleteAllBtn  = document.getElementById('deleteAllBtn');
 
 let selectedFile = null;
 
 dropZone.addEventListener('click', () => fileInput.click());
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave',  () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
@@ -24,10 +36,7 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
 
 function setFile(f) {
-  if (!f.name.toLowerCase().endsWith('.mp4')) {
-    alert('Chỉ hỗ trợ file .mp4');
-    return;
-  }
+  if (!f.name.toLowerCase().endsWith('.mp4')) { alert('Chỉ hỗ trợ file .mp4'); return; }
   selectedFile = f;
   fileNameEl.textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
   submitBtn.disabled = false;
@@ -60,34 +69,111 @@ document.getElementById('uploadForm').addEventListener('submit', async e => {
     return;
   }
 
-  // Poll for completion
+  pollJob(jobId, progressFill, statusText, progressEl, resultEl, downloadLink, submitBtn);
+});
+
+// ── TTS ───────────────────────────────────────────────────────
+const ttsText        = document.getElementById('ttsText');
+const voiceSelect    = document.getElementById('voiceSelect');
+const ttsSubmitBtn   = document.getElementById('ttsSubmitBtn');
+const ttsProgressEl  = document.getElementById('ttsProgress');
+const ttsProgressFill = document.getElementById('ttsProgressFill');
+const ttsStatusText  = document.getElementById('ttsStatusText');
+const ttsResultEl    = document.getElementById('ttsResult');
+const ttsDownloadLink = document.getElementById('ttsDownloadLink');
+const charCount      = document.getElementById('charCount');
+
+ttsText.addEventListener('input', () => {
+  const len = ttsText.value.length;
+  charCount.textContent = len + ' / 3000';
+  charCount.style.color = len > 2800 ? 'var(--accent2)' : '';
+});
+
+async function loadVoices() {
+  voiceSelect.innerHTML = '<option value="">Đang tải…</option>';
+  ttsSubmitBtn.disabled = true;
+  try {
+    const res = await fetch('/api/voices');
+    if (!res.ok) throw new Error();
+    const voices = await res.json();
+    if (!Array.isArray(voices) || voices.length === 0) throw new Error();
+    voiceSelect.innerHTML = voices.map(v =>
+      `<option value="${v.id}">${v.name}</option>`
+    ).join('');
+    ttsSubmitBtn.disabled = ttsText.value.trim() === '';
+  } catch {
+    voiceSelect.innerHTML = '<option value="">VieNeu chưa sẵn sàng — thử lại sau</option>';
+  }
+}
+
+ttsText.addEventListener('input', () => {
+  ttsSubmitBtn.disabled = ttsText.value.trim() === '' || voiceSelect.options[0]?.value === '';
+});
+
+document.getElementById('ttsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = ttsText.value.trim();
+  if (!text) return;
+
+  ttsSubmitBtn.disabled = true;
+  ttsProgressEl.classList.remove('hidden');
+  ttsResultEl.classList.add('hidden');
+  ttsProgressFill.style.width = '20%';
+  ttsStatusText.textContent = 'Đang gửi yêu cầu…';
+
+  const fd = new FormData();
+  fd.append('text', text);
+  fd.append('voice_id', voiceSelect.value);
+
+  let jobId;
+  try {
+    const res = await fetch('/api/tts', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Lỗi gửi yêu cầu');
+    jobId = data.job_id;
+    ttsProgressFill.style.width = '40%';
+    ttsStatusText.textContent = 'Đang tạo giọng đọc… (job #' + jobId + ')';
+  } catch (err) {
+    ttsStatusText.textContent = '❌ ' + err.message;
+    ttsSubmitBtn.disabled = false;
+    return;
+  }
+
+  pollJob(jobId, ttsProgressFill, ttsStatusText, ttsProgressEl, ttsResultEl, ttsDownloadLink, ttsSubmitBtn);
+});
+
+// ── Shared poll ───────────────────────────────────────────────
+function pollJob(jobId, fill, statusEl, progressContainer, resultContainer, dlLink, btn) {
   const interval = setInterval(async () => {
     try {
       const res = await fetch('/api/jobs/' + jobId);
       const job = await res.json();
       if (job.status === 'done') {
         clearInterval(interval);
-        progressFill.style.width = '100%';
-        statusText.textContent = 'Hoàn thành!';
+        fill.style.width = '100%';
+        statusEl.textContent = 'Hoàn thành!';
         setTimeout(() => {
-          progressEl.classList.add('hidden');
-          resultEl.classList.remove('hidden');
-          downloadLink.href = '/api/download/' + jobId;
-          submitBtn.disabled = false;
+          progressContainer.classList.add('hidden');
+          resultContainer.classList.remove('hidden');
+          dlLink.href = '/api/download/' + jobId;
+          btn.disabled = false;
           loadHistory();
         }, 600);
       } else if (job.status === 'failed') {
         clearInterval(interval);
-        statusText.textContent = '❌ Lỗi: ' + (job.error_msg || 'Không xác định');
-        submitBtn.disabled = false;
+        statusEl.textContent = '❌ Lỗi: ' + (job.error_msg || 'Không xác định');
+        btn.disabled = false;
       } else {
-        // animate progress 40→90
-        const cur = parseFloat(progressFill.style.width) || 40;
-        if (cur < 90) progressFill.style.width = (cur + 3) + '%';
+        const cur = parseFloat(fill.style.width) || 40;
+        if (cur < 90) fill.style.width = (cur + 2) + '%';
       }
     } catch {}
   }, 1500);
-});
+}
+
+// ── History ───────────────────────────────────────────────────
+const jobBody      = document.getElementById('jobBody');
+const deleteAllBtn = document.getElementById('deleteAllBtn');
 
 async function loadHistory() {
   try {
@@ -96,14 +182,21 @@ async function loadHistory() {
     jobBody.innerHTML = '';
     (jobs || []).forEach(j => {
       const tr = document.createElement('tr');
-      const fileName = j.input_file.split('/').pop().replace(/^\d+_/, '');
+      const isTTS = j.type === 'text_to_speech';
+      const displayName = isTTS
+        ? j.input_file.replace('[TTS] ', '')
+        : j.input_file.split('/').pop().replace(/^\d+_/, '');
+      const typeLabel = isTTS
+        ? '<span class="badge badge-tts">TTS</span>'
+        : '<span class="badge badge-mp4">MP4</span>';
       const date = new Date(j.created_at).toLocaleString('vi-VN');
       const dl = j.status === 'done'
         ? `<a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>`
         : '—';
       tr.innerHTML = `
         <td>${j.id}</td>
-        <td title="${j.input_file}">${fileName}</td>
+        <td title="${j.input_file}">${displayName}</td>
+        <td>${typeLabel}</td>
         <td><span class="badge badge-${j.status}">${labelStatus(j.status)}</span></td>
         <td>${date}</td>
         <td>${dl}</td>
@@ -117,8 +210,7 @@ async function loadHistory() {
 jobBody.addEventListener('click', async e => {
   const btn = e.target.closest('.btn-delete-row');
   if (!btn) return;
-  const id = btn.dataset.id;
-  await fetch('/api/jobs/' + id, { method: 'DELETE' });
+  await fetch('/api/jobs/' + btn.dataset.id, { method: 'DELETE' });
   loadHistory();
 });
 
