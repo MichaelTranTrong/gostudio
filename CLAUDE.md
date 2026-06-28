@@ -164,6 +164,11 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Thay thế: **đếm ngược 3-2-1** (`Countdown.swift`) trước khi quay video — overlay không chặn chuột, tắt trước khi quay → kịp đưa con trỏ ra chỗ khuất, không lọt vào video
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.3
 
+### 18. v1.3.4 — Tách Chụp ảnh / Quay video thành 2 tab con
+- Vì options đã khác nhau (ảnh: ẩn con trỏ; video: âm thanh + đếm ngược) → tách trong cùng tab "Quay màn hình" thành **2 tab con** (subtabs) Chụp ảnh / Quay video, không thêm tab trên header
+- Chỉ sửa frontend (`index.html`, `app.js`, `style.css`); mỗi tab con chỉ hiện điều khiển liên quan
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.4
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -194,9 +199,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.3.3
+- Ổn định v1.3.4
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.3
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.4
 
 ---
 
@@ -241,3 +246,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.3.1 | Chọn cửa sổ cho chụp ảnh (`-i -w`) & quay video (dropdown + `SCContentFilter`) |
 | v1.3.2 | Chọn vùng với kính lúp phóng to (overlay tự dựng) cho ảnh + video, crop FFmpeg |
 | v1.3.3 | Ẩn con trỏ khi chụp ảnh + đếm ngược 3-2-1 trước khi quay video |
+| v1.3.4 | Tách Chụp ảnh / Quay video thành 2 tab con trong bảng điều khiển |

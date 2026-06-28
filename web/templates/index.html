@@ -78,46 +78,74 @@
     </section>
   </div>
 
-  <!-- Tab: Quay màn hình -->
+  <!-- Tab: Quay màn hình (chứa 2 tab con: Chụp ảnh / Quay video) -->
   <div id="tab-capture" class="hidden">
     <section class="card">
-      <h2>Quay màn hình & Chụp ảnh (macOS)</h2>
+      <h2>Chụp & Quay màn hình (macOS)</h2>
       <p class="hint">
-        Mở app GoStudio Capture trên máy để quay/chụp màn hình. File sẽ tự tải về Go Studio và hiện trong lịch sử.
+        Mở app GoStudio Capture để chụp/quay màn hình. File tự tải về Go Studio và hiện trong lịch sử.
         Cần cài app native (chỉ chạy khi bấm, không chạy ngầm).
       </p>
 
-      <div class="form-group">
-        <label class="form-label">Phạm vi</label>
-        <select id="capRegion">
-          <option value="full">Toàn màn hình</option>
-          <option value="window">Cửa sổ</option>
-          <option value="area">Chọn vùng</option>
-        </select>
+      <!-- Tab con -->
+      <div class="subtabs">
+        <button type="button" class="subtab active" data-sub="shot">📷 Chụp ảnh</button>
+        <button type="button" class="subtab" data-sub="vid">🎥 Quay video</button>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Âm thanh (khi quay video)</label>
-        <select id="capAudio">
-          <option value="system">Âm thanh hệ thống</option>
-          <option value="none">Không âm thanh</option>
-          <option value="mic">Micro</option>
-          <option value="both">Hệ thống + Micro</option>
-        </select>
+      <!-- Tab con: Chụp ảnh -->
+      <div id="sub-shot">
+        <div class="form-group">
+          <label class="form-label">Phạm vi</label>
+          <select id="shotRegion">
+            <option value="full">Toàn màn hình</option>
+            <option value="window">Cửa sổ</option>
+            <option value="area">Chọn vùng (có kính lúp)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="check-label">
+            <input type="checkbox" id="shotHideCursor"/> Ẩn con trỏ chuột
+          </label>
+        </div>
+
+        <div class="capture-actions">
+          <button type="button" id="shotBtn" class="btn-download">📷 Chụp ảnh</button>
+        </div>
+
+        <p id="shotHint" class="hint capture-status hidden"></p>
       </div>
 
-      <div class="form-group">
-        <label class="check-label">
-          <input type="checkbox" id="capHideCursor"/> Ẩn con trỏ chuột
-        </label>
-      </div>
+      <!-- Tab con: Quay video -->
+      <div id="sub-vid" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Phạm vi</label>
+          <select id="vidRegion">
+            <option value="full">Toàn màn hình</option>
+            <option value="window">Cửa sổ</option>
+            <option value="area">Chọn vùng (có kính lúp)</option>
+          </select>
+        </div>
 
-      <div class="capture-actions">
-        <button type="button" id="screenshotBtn" class="btn-download">📷 Chụp ảnh</button>
-        <button type="button" id="recordBtn" class="btn-download">🎥 Quay video</button>
-      </div>
+        <div class="form-group">
+          <label class="form-label">Âm thanh</label>
+          <select id="vidAudio">
+            <option value="system">Âm thanh hệ thống</option>
+            <option value="none">Không âm thanh</option>
+            <option value="mic">Micro</option>
+            <option value="both">Hệ thống + Micro</option>
+          </select>
+        </div>
 
-      <p id="capHint" class="hint capture-status hidden"></p>
+        <p class="hint">Có đếm ngược 3 giây trước khi quay (để giấu con trỏ); dừng bằng nút ⏹ trên thanh menu.</p>
+
+        <div class="capture-actions">
+          <button type="button" id="vidBtn" class="btn-download">🎥 Quay video</button>
+        </div>
+
+        <p id="vidHint" class="hint capture-status hidden"></p>
+      </div>
     </section>
   </div>
 

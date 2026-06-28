@@ -5,10 +5,21 @@ document.querySelectorAll('nav a[data-tab]').forEach(link => {
     const tab = link.dataset.tab;
     document.querySelectorAll('nav a[data-tab]').forEach(a => a.classList.remove('active'));
     link.classList.add('active');
-    document.getElementById('tab-mp4').classList.toggle('hidden', tab !== 'mp4');
-    document.getElementById('tab-tts').classList.toggle('hidden', tab !== 'tts');
-    document.getElementById('tab-capture').classList.toggle('hidden', tab !== 'capture');
+    ['mp4', 'tts', 'capture'].forEach(t => {
+      document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+    });
     if (tab === 'tts') loadVoices();
+  });
+});
+
+// ── Tab con trong "Quay màn hình" (Chụp ảnh / Quay video) ──────
+document.querySelectorAll('.subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const sub = btn.dataset.sub;
+    document.getElementById('sub-shot').classList.toggle('hidden', sub !== 'shot');
+    document.getElementById('sub-vid').classList.toggle('hidden', sub !== 'vid');
   });
 });
 
@@ -143,26 +154,17 @@ document.getElementById('ttsForm').addEventListener('submit', async e => {
   pollJob(jobId, ttsProgressFill, ttsStatusText, ttsProgressEl, ttsResultEl, ttsDownloadLink, ttsSubmitBtn);
 });
 
-// ── Quay màn hình / Chụp ảnh (macOS native app) ───────────────
-const capRegion     = document.getElementById('capRegion');
-const capAudio      = document.getElementById('capAudio');
-const capHideCursor = document.getElementById('capHideCursor');
-const screenshotBtn = document.getElementById('screenshotBtn');
-const recordBtn     = document.getElementById('recordBtn');
-const capHint       = document.getElementById('capHint');
-
-function launchCapture(mode) {
+// ── Chụp ảnh / Quay video (macOS native app) ──────────────────
+function launchCapture(mode, paramObj, hintEl) {
   // Số job hiện tại để phát hiện job mới xuất hiện sau khi capture.
   fetch('/api/jobs').then(r => r.json()).then(jobs => {
     const before = (jobs || []).length;
 
-    const params = new URLSearchParams({ mode, region: capRegion.value });
-    if (mode === 'video') params.set('audio', capAudio.value);
-    if (capHideCursor.checked) params.set('cursor', 'hide');
+    const params = new URLSearchParams({ mode, ...paramObj });
     window.location.href = 'gostudio://capture?' + params.toString();
 
-    capHint.classList.remove('hidden');
-    capHint.textContent = '📂 Đã mở app GoStudio Capture — bấm "Bắt đầu" trong app để ' +
+    hintEl.classList.remove('hidden');
+    hintEl.textContent = '📂 Đã mở app GoStudio Capture — bấm "Bắt đầu" trong app để ' +
       (mode === 'video' ? 'quay.' : 'chụp.') + ' File sẽ tự về lịch sử bên dưới.';
 
     // Theo dõi tới 3 phút (đủ thời gian cấp quyền + quay). Hết giờ chỉ nhắc nhẹ.
@@ -173,21 +175,34 @@ function launchCapture(mode) {
         const now = await (await fetch('/api/jobs')).json();
         if ((now || []).length > before) {
           clearInterval(iv);
-          capHint.textContent = '✅ Đã nhận file, xem trong lịch sử bên dưới.';
+          hintEl.textContent = '✅ Đã nhận file, xem trong lịch sử bên dưới.';
           loadHistory();
           return;
         }
       } catch {}
       if (waited >= 180) {
         clearInterval(iv);
-        capHint.innerHTML = 'ℹ️ Chưa nhận được file. Nếu app không mở, kiểm tra đã cài <strong>GoStudio Capture</strong> chưa.';
+        hintEl.innerHTML = 'ℹ️ Chưa nhận được file. Nếu app không mở, kiểm tra đã cài <strong>GoStudio Capture</strong> chưa.';
       }
     }, 2000);
   });
 }
 
-screenshotBtn.addEventListener('click', () => launchCapture('screenshot'));
-recordBtn.addEventListener('click', () => launchCapture('video'));
+// Tab Chụp ảnh: phạm vi + ẩn con trỏ.
+document.getElementById('shotBtn').addEventListener('click', () => {
+  const p = { region: document.getElementById('shotRegion').value };
+  if (document.getElementById('shotHideCursor').checked) p.cursor = 'hide';
+  launchCapture('screenshot', p, document.getElementById('shotHint'));
+});
+
+// Tab Quay video: phạm vi + âm thanh (có đếm ngược trong app).
+document.getElementById('vidBtn').addEventListener('click', () => {
+  const p = {
+    region: document.getElementById('vidRegion').value,
+    audio: document.getElementById('vidAudio').value,
+  };
+  launchCapture('video', p, document.getElementById('vidHint'));
+});
 
 // ── Shared poll ───────────────────────────────────────────────
 function pollJob(jobId, fill, statusEl, progressContainer, resultContainer, dlLink, btn) {
