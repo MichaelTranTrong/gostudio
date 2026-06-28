@@ -1,4 +1,5 @@
 import Cocoa
+import ScreenCaptureKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private enum PanelState { case idle, needPermission, recording, saving }
@@ -12,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var controlWindow: NSWindow?
     private var primaryButton: NSButton?
     private var statusLabel: NSTextField?
+    private var windowPopup: NSPopUpButton?
+    private var pickableWindows: [SCWindow] = []
 
     // Nếu app chạy mà không kèm URL (vd lần đầu để đăng ký scheme) → thoát sau 3s.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -44,7 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Panel điều khiển
 
     private func showControlPanel(for request: CaptureRequest) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 160),
+        let needsWindowPicker = (request.mode == .video && request.region == .window)
+        let height: CGFloat = needsWindowPicker ? 205 : 160
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: height),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "GoStudio Capture"
         window.level = .floating
@@ -53,8 +59,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.center()
 
         let status = NSTextField(wrappingLabelWithString: describe(request))
-        status.frame = NSRect(x: 20, y: 70, width: 320, height: 70)
+        status.frame = NSRect(x: 20, y: height - 90, width: 320, height: 70)
         statusLabel = status
+        window.contentView?.addSubview(status)
+
+        // Dropdown chọn cửa sổ (chỉ cho quay video theo cửa sổ).
+        if needsWindowPicker {
+            let popup = NSPopUpButton(frame: NSRect(x: 20, y: 66, width: 320, height: 26))
+            popup.addItem(withTitle: "Đang tải danh sách cửa sổ…")
+            popup.isEnabled = false
+            windowPopup = popup
+            window.contentView?.addSubview(popup)
+            loadWindowsIntoPopup()
+        }
 
         let primary = NSButton(title: request.mode == .video ? "🎥 Bắt đầu quay" : "📷 Chụp ngay",
                                target: self, action: #selector(primaryTapped))
@@ -67,7 +84,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         cancel.frame = NSRect(x: 250, y: 18, width: 90, height: 40)
         cancel.bezelStyle = .rounded
 
-        window.contentView?.addSubview(status)
         window.contentView?.addSubview(primary)
         window.contentView?.addSubview(cancel)
         window.makeKeyAndOrderFront(nil)
@@ -135,12 +151,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.doScreenshot(request)
             }
         case .video:
-            state = .recording
-            startRecording(request)
-            // Ẩn giao diện app khỏi màn hình đang quay…
-            controlWindow?.orderOut(nil)
-            // …và hiện nút ⏹ trên thanh menu để dừng (giống macOS).
-            showStopStatusItem()
+            if request.region == .window {
+                let idx = windowPopup?.indexOfSelectedItem ?? -1
+                guard idx >= 0, idx < pickableWindows.count else {
+                    statusLabel?.stringValue = "Chưa chọn được cửa sổ. Hãy chọn trong danh sách rồi bấm lại."
+                    return
+                }
+                beginVideoRecording(window: pickableWindows[idx])
+            } else {
+                beginVideoRecording(window: nil) // toàn màn hình (area tạm = full)
+            }
+        }
+    }
+
+    private func beginVideoRecording(window: SCWindow?) {
+        state = .recording
+        startRecording(window: window)
+        // Ẩn giao diện app khỏi khung hình…
+        controlWindow?.orderOut(nil)
+        // …và hiện nút ⏹ trên thanh menu để dừng (giống macOS).
+        showStopStatusItem()
+    }
+
+    // MARK: - Nạp danh sách cửa sổ vào dropdown (region=window)
+
+    private func loadWindowsIntoPopup() {
+        Task {
+            let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+            let mine = Bundle.main.bundleIdentifier
+            let windows = (content?.windows ?? []).filter {
+                $0.isOnScreen
+                    && ($0.title?.isEmpty == false)
+                    && $0.owningApplication?.bundleIdentifier != mine
+                    && $0.frame.width > 80 && $0.frame.height > 80
+            }
+            await MainActor.run {
+                self.pickableWindows = windows
+                guard let popup = self.windowPopup else { return }
+                popup.removeAllItems()
+                if windows.isEmpty {
+                    popup.addItem(withTitle: "Không tìm thấy cửa sổ nào")
+                    popup.isEnabled = false
+                } else {
+                    for w in windows {
+                        let app = w.owningApplication?.applicationName ?? "?"
+                        popup.addItem(withTitle: "\(app) — \(w.title ?? "")")
+                    }
+                    popup.isEnabled = true
+                }
+            }
         }
     }
 
@@ -171,18 +230,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func doScreenshot(_ request: CaptureRequest) {
         let output = Config.tempFile(prefix: "screenshot", ext: "png")
-        if Screenshotter.capture(region: request.region, to: output) {
-            uploadAndQuit(fileURL: output, type: "screenshot")
-        } else {
-            quit()
+        // Chạy nền: screencapture tương tác (-i) sẽ chặn cho tới khi chọn xong,
+        // không được block main run loop.
+        DispatchQueue.global().async {
+            let ok = Screenshotter.capture(region: request.region, to: output)
+            DispatchQueue.main.async {
+                if ok {
+                    self.uploadAndQuit(fileURL: output, type: "screenshot")
+                } else {
+                    self.quit()
+                }
+            }
         }
     }
 
     // MARK: - Quay video
 
-    private func startRecording(_ request: CaptureRequest) {
+    private func startRecording(window: SCWindow?) {
         let output = Config.tempFile(prefix: "recording", ext: "mp4")
-        let recorder = ScreenRecorder(outputURL: output, captureAudio: request.capturesAudio)
+        let recorder = ScreenRecorder(outputURL: output,
+                                      captureAudio: request?.capturesAudio ?? false,
+                                      window: window)
         self.recorder = recorder
         Task {
             do {

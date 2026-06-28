@@ -58,6 +58,6 @@ Từ đó quyền **dính vĩnh viễn** qua mọi lần build. Developer accoun
 phân phối cho máy Mac khác.
 
 ## Hạn chế hiện tại (TODO)
-- Video chỉ quay màn hình chính, full-screen (chưa theo `region` window/area).
+- Video `region=area` (kéo chọn vùng) chưa làm — tạm quay toàn màn hình. `full` và `window` đã hỗ trợ.
 - Audio video: mới `system`; `mic`/`both` chưa trộn micro.
 - Chưa nhân scale factor cho màn hình Retina (video có thể nhỏ hơn độ phân giải thật).
