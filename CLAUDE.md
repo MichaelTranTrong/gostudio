@@ -141,6 +141,14 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Thiết kế chi tiết: [docs/screen-capture-design.md](docs/screen-capture-design.md)
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.0
 
+### 15. v1.3.1 — Chọn cửa sổ cho chụp ảnh & quay video
+- **Chụp ảnh cửa sổ/vùng**: sửa bug thiếu cờ `-i` của `screencapture` (window=`-i -w`, area=`-i`) → giờ vào đúng chế độ click-chọn / kéo chọn
+- **Quay video theo cửa sổ**: thêm dropdown chọn cửa sổ trên panel, quay đúng cửa sổ qua `SCContentFilter(desktopIndependentWindow:)`
+- Hai cách chọn giữ khác nhau (ảnh: overlay click của macOS; video: dropdown) — ScreenCaptureKit không có UI chọn sẵn
+- Chạy `screencapture` ở luồng nền (tránh block main run loop)
+- Còn lại: video `region=area` (kéo vùng) chưa làm — tạm quay full
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.1
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -170,9 +178,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.3.0
+- Ổn định v1.3.1
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.1
 
 ---
 
@@ -200,7 +208,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
-- [ ] Quay video macOS: hỗ trợ region cửa sổ/vùng, thu micro, nhân scale Retina (hiện full-screen + system audio)
+- [ ] Quay video macOS: kéo chọn vùng (area), thu micro, nhân scale Retina (cửa sổ đã xong ở v1.3.1)
 
 ---
 
@@ -214,3 +222,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.2.0 | Chữ → Tiếng (TTS) với VieNeu-TTS, service Python riêng trong Docker |
 | v1.2.1 | Sửa lỗi TTS đọc câu reference + lặp lại (use_chat_format) |
 | v1.3.0 | Quay màn hình & chụp ảnh macOS qua native app (ScreenCaptureKit, scheme `gostudio://`) |
+| v1.3.1 | Chọn cửa sổ cho chụp ảnh (`-i -w`) & quay video (dropdown + `SCContentFilter`) |
