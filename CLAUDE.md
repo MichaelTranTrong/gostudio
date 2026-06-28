@@ -149,6 +149,14 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Còn lại: video `region=area` (kéo vùng) chưa làm — tạm quay full
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.1
 
+### 16. v1.3.2 — Chọn vùng với kính lúp phóng to (ảnh + video)
+- macOS region selection chỉ hiện tọa độ, **không có kính lúp** → tự dựng overlay (`AreaSelector.swift`): ảnh chụp tĩnh làm nền, kéo chọn vùng, **vòng tròn kính lúp phóng to pixel** (interpolation `.none`) + tọa độ
+- **Chụp ảnh vùng**: overlay → chụp đúng vùng qua `screencapture -R x,y,w,h`
+- **Quay video vùng**: overlay lấy tọa độ → quay full màn hình → **backend cắt bằng FFmpeg** (`crop=w:h:x:y`), vì `SCStreamConfiguration.sourceRect` cần macOS 14 (máy đang Ventura 13)
+- Backend: `capture.go` nhận `crop_x/y/w/h`, `processCaptureVideo` gộp transcode + crop
+- Tọa độ thống nhất: video quay ở độ phân giải điểm (1440×900) = tọa độ overlay → crop khớp
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.2
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -178,9 +186,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.3.1
+- Ổn định v1.3.2
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.2
 
 ---
 
@@ -208,7 +216,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
-- [ ] Quay video macOS: kéo chọn vùng (area), thu micro, nhân scale Retina (cửa sổ đã xong ở v1.3.1)
+- [ ] Quay video macOS: thu micro, nhân scale Retina (cửa sổ + vùng đã xong ở v1.3.1/v1.3.2)
 
 ---
 
@@ -223,3 +231,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.2.1 | Sửa lỗi TTS đọc câu reference + lặp lại (use_chat_format) |
 | v1.3.0 | Quay màn hình & chụp ảnh macOS qua native app (ScreenCaptureKit, scheme `gostudio://`) |
 | v1.3.1 | Chọn cửa sổ cho chụp ảnh (`-i -w`) & quay video (dropdown + `SCContentFilter`) |
+| v1.3.2 | Chọn vùng với kính lúp phóng to (overlay tự dựng) cho ảnh + video, crop FFmpeg |

@@ -2,7 +2,8 @@ import Foundation
 
 // Upload file capture lên Go Studio backend (multipart/form-data).
 enum Uploader {
-    static func upload(fileURL: URL, type: String, completion: @escaping (Bool, String) -> Void) {
+    static func upload(fileURL: URL, type: String, crop: CGRect? = nil,
+                       completion: @escaping (Bool, String) -> Void) {
         guard let endpoint = URL(string: Config.backendURL + "/api/capture/upload") else {
             completion(false, "URL backend không hợp lệ")
             return
@@ -18,10 +19,21 @@ enum Uploader {
 
         var body = Data()
 
-        // field: type
-        body.appendString("--\(boundary)\r\n")
-        body.appendString("Content-Disposition: form-data; name=\"type\"\r\n\r\n")
-        body.appendString("\(type)\r\n")
+        func field(_ name: String, _ value: String) {
+            body.appendString("--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            body.appendString("\(value)\r\n")
+        }
+
+        field("type", type)
+
+        // Vùng cắt (cho quay video theo vùng) — backend cắt bằng FFmpeg.
+        if let crop = crop {
+            field("crop_x", "\(Int(crop.minX))")
+            field("crop_y", "\(Int(crop.minY))")
+            field("crop_w", "\(Int(crop.width))")
+            field("crop_h", "\(Int(crop.height))")
+        }
 
         // field: file
         let fileData = (try? Data(contentsOf: fileURL)) ?? Data()

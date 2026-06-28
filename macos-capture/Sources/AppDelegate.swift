@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusLabel: NSTextField?
     private var windowPopup: NSPopUpButton?
     private var pickableWindows: [SCWindow] = []
+    private var cropRect: CGRect?   // vùng cắt cho quay video theo vùng
 
     // Nếu app chạy mà không kèm URL (vd lần đầu để đăng ký scheme) → thoát sau 3s.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -147,8 +148,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         switch request.mode {
         case .screenshot:
             controlWindow?.orderOut(nil) // ẩn panel để không lọt vào ảnh
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                self.doScreenshot(request)
+            if request.region == .area {
+                // Đợi panel biến mất rồi mở overlay kính lúp (chụp ảnh nền sạch).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.selectAreaThenScreenshot()
+                }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.doScreenshot(request)
+                }
             }
         case .video:
             if request.region == .window {
@@ -158,9 +166,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     return
                 }
                 beginVideoRecording(window: pickableWindows[idx])
+            } else if request.region == .area {
+                controlWindow?.orderOut(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.selectAreaThenRecord()
+                }
             } else {
-                beginVideoRecording(window: nil) // toàn màn hình (area tạm = full)
+                beginVideoRecording(window: nil) // toàn màn hình
             }
+        }
+    }
+
+    // Chọn vùng (overlay kính lúp) → quay full màn hình → backend cắt vùng bằng FFmpeg.
+    private func selectAreaThenRecord() {
+        AreaSelector.present { rect in
+            guard let rect = rect else { self.quit(); return }
+            self.cropRect = rect
+            self.beginVideoRecording(window: nil)
         }
     }
 
@@ -228,6 +250,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: - Chụp ảnh
 
+    private func selectAreaThenScreenshot() {
+        AreaSelector.present { rect in
+            guard let rect = rect else { self.quit(); return } // hủy
+            let output = Config.tempFile(prefix: "screenshot", ext: "png")
+            DispatchQueue.global().async {
+                let ok = Screenshotter.captureRect(rect, to: output)
+                DispatchQueue.main.async {
+                    if ok {
+                        self.uploadAndQuit(fileURL: output, type: "screenshot")
+                    } else {
+                        self.quit()
+                    }
+                }
+            }
+        }
+    }
+
     private func doScreenshot(_ request: CaptureRequest) {
         let output = Config.tempFile(prefix: "screenshot", ext: "png")
         // Chạy nền: screencapture tương tác (-i) sẽ chặn cho tới khi chọn xong,
@@ -283,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Upload + thoát
 
     private func uploadAndQuit(fileURL: URL, type: String) {
-        Uploader.upload(fileURL: fileURL, type: type) { _, _ in
+        Uploader.upload(fileURL: fileURL, type: type, crop: cropRect) { _, _ in
             DispatchQueue.main.async {
                 try? FileManager.default.removeItem(at: fileURL)
                 self.quit()

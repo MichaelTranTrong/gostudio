@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,8 +71,10 @@ func CaptureUpload(c *gin.Context) {
 		return
 	}
 
-	if ext == ".mov" {
-		go transcodeCapture(jobID, storedPath, ts)
+	// Cần xử lý FFmpeg nếu: file .mov (transcode) hoặc có vùng cắt (crop).
+	cropFilter := buildCropFilter(c)
+	if ext == ".mov" || cropFilter != "" {
+		go processCaptureVideo(jobID, storedPath, ts, cropFilter)
 	} else {
 		_ = models.UpdateJob(jobID, "done", storedPath, "")
 	}
@@ -79,22 +82,42 @@ func CaptureUpload(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"job_id": jobID, "message": "Đã nhận file capture"})
 }
 
-// transcodeCapture chuyển .mov (QuickTime) sang .mp4 (H.264/AAC) để phát được trên web.
-func transcodeCapture(jobID uint64, movPath string, ts int64) {
+// processCaptureVideo chạy FFmpeg: transcode .mov→.mp4 và/hoặc cắt vùng (crop).
+func processCaptureVideo(jobID uint64, inputPath string, ts int64, cropFilter string) {
 	_ = models.UpdateJob(jobID, "processing", "", "")
 
 	mp4Path := filepath.Join(outputDir, fmt.Sprintf("%d_screen.mp4", ts))
-	cmd := exec.Command("ffmpeg", "-i", movPath, "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", mp4Path, "-y")
-	out, err := cmd.CombinedOutput()
+	args := []string{"-i", inputPath}
+	if cropFilter != "" {
+		args = append(args, "-vf", cropFilter)
+	}
+	args = append(args, "-c:v", "libx264", "-preset", "fast", "-c:a", "aac", mp4Path, "-y")
+
+	out, err := exec.Command("ffmpeg", args...).CombinedOutput()
 	if err != nil {
-		log.Printf("capture transcode job %d: %v\n%s", jobID, err, string(out))
+		log.Printf("capture video job %d: %v\n%s", jobID, err, string(out))
 		_ = models.UpdateJob(jobID, "failed", "", err.Error())
 		return
 	}
 
-	os.Remove(movPath)
+	os.Remove(inputPath)
 	_ = models.UpdateJob(jobID, "done", mp4Path, "")
 	log.Printf("capture job %d done: %s", jobID, mp4Path)
+}
+
+// buildCropFilter trả "crop=w:h:x:y" nếu có đủ 4 tham số nguyên hợp lệ, ngược lại "".
+func buildCropFilter(c *gin.Context) string {
+	w, h := c.PostForm("crop_w"), c.PostForm("crop_h")
+	x, y := c.PostForm("crop_x"), c.PostForm("crop_y")
+	for _, v := range []string{w, h, x, y} {
+		if v == "" {
+			return ""
+		}
+		if _, err := strconv.Atoi(v); err != nil {
+			return ""
+		}
+	}
+	return fmt.Sprintf("crop=%s:%s:%s:%s", w, h, x, y)
 }
 
 func captureLabel(captureType, name string) string {
