@@ -9,6 +9,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
     private let outputURL: URL
     private let captureAudio: Bool
     private let window: SCWindow?
+    private let hideCursor: Bool
     private let queue = DispatchQueue(label: "gostudio.capture.sample")
 
     private var stream: SCStream?
@@ -17,10 +18,11 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
     private var audioInput: AVAssetWriterInput?
     private var sessionStarted = false
 
-    init(outputURL: URL, captureAudio: Bool, window: SCWindow? = nil) {
+    init(outputURL: URL, captureAudio: Bool, window: SCWindow? = nil, hideCursor: Bool = false) {
         self.outputURL = outputURL
         self.captureAudio = captureAudio
         self.window = window
+        self.hideCursor = hideCursor
     }
 
     func start() async throws {
@@ -48,6 +50,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.capturesAudio = captureAudio
+        config.showsCursor = !hideCursor   // có tác dụng từ macOS 14+; Ventura vẫn hiện con trỏ
         config.queueDepth = 6
 
         try setupWriter(width: width, height: height)

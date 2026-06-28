@@ -152,6 +152,8 @@ tr:last-child td { border-bottom: none; }
 
 .capture-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .capture-status { margin-top: 14px; }
+.check-label { display: flex; align-items: center; gap: 8px; color: var(--text); cursor: pointer; }
+.check-label input { width: 16px; height: 16px; cursor: pointer; }
 
 .dl-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 .dl-link:hover { text-decoration: underline; }

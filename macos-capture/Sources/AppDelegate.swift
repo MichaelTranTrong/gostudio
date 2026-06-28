@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if request.mode == .video {
             let audio = request.capturesAudio ? "có âm thanh hệ thống" : "không âm thanh"
             return "Quay video — \(region), \(audio).\n" +
-                   "Bấm để bắt đầu. App ẩn đi; dừng bằng nút ⏹ trên thanh menu (góc trên phải)."
+                   "Bấm để bắt đầu (đếm ngược 3s để giấu con trỏ); dừng bằng nút ⏹ trên thanh menu."
         }
         return "Chụp ảnh — \(region).\nBấm để chụp."
     }
@@ -188,11 +188,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func beginVideoRecording(window: SCWindow?) {
         state = .recording
-        startRecording(window: window)
-        // Ẩn giao diện app khỏi khung hình…
-        controlWindow?.orderOut(nil)
-        // …và hiện nút ⏹ trên thanh menu để dừng (giống macOS).
-        showStopStatusItem()
+        controlWindow?.orderOut(nil)            // ẩn panel
+        // Đếm ngược 3-2-1 (kịp giấu con trỏ) rồi mới quay; overlay tắt trước khi quay.
+        Countdown.show(from: 3) {
+            self.startRecording(window: window)
+            self.showStopStatusItem()           // nút ⏹ trên thanh menu
+        }
     }
 
     // MARK: - Nạp danh sách cửa sổ vào dropdown (region=window)
@@ -254,8 +255,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AreaSelector.present { rect in
             guard let rect = rect else { self.quit(); return } // hủy
             let output = Config.tempFile(prefix: "screenshot", ext: "png")
+            let hide = self.request?.hideCursor ?? false
             DispatchQueue.global().async {
-                let ok = Screenshotter.captureRect(rect, to: output)
+                let ok = Screenshotter.captureRect(rect, hideCursor: hide, to: output)
                 DispatchQueue.main.async {
                     if ok {
                         self.uploadAndQuit(fileURL: output, type: "screenshot")
@@ -272,7 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Chạy nền: screencapture tương tác (-i) sẽ chặn cho tới khi chọn xong,
         // không được block main run loop.
         DispatchQueue.global().async {
-            let ok = Screenshotter.capture(region: request.region, to: output)
+            let ok = Screenshotter.capture(region: request.region, hideCursor: request.hideCursor, to: output)
             DispatchQueue.main.async {
                 if ok {
                     self.uploadAndQuit(fileURL: output, type: "screenshot")
@@ -289,7 +291,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let output = Config.tempFile(prefix: "recording", ext: "mp4")
         let recorder = ScreenRecorder(outputURL: output,
                                       captureAudio: request?.capturesAudio ?? false,
-                                      window: window)
+                                      window: window,
+                                      hideCursor: request?.hideCursor ?? false)
         self.recorder = recorder
         Task {
             do {

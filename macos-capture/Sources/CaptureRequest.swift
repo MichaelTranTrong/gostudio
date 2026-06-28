@@ -9,6 +9,7 @@ struct CaptureRequest {
     let mode: CaptureMode
     let region: CaptureRegion
     let audio: CaptureAudio
+    let hideCursor: Bool
     let rawURL: String
 
     init?(url: URL) {
@@ -21,6 +22,7 @@ struct CaptureRequest {
         self.mode = mode
         self.region = CaptureRegion(rawValue: value("region") ?? "full") ?? .full
         self.audio = CaptureAudio(rawValue: value("audio") ?? "none") ?? .none
+        self.hideCursor = (value("cursor") == "hide")
         self.rawURL = url.absoluteString
     }
 

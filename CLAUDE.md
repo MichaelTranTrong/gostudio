@@ -157,6 +157,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Tọa độ thống nhất: video quay ở độ phân giải điểm (1440×900) = tọa độ overlay → crop khớp
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.2
 
+### 17. v1.3.3 — Ẩn con trỏ (ảnh) + đếm ngược trước khi quay
+- Checkbox **"Ẩn con trỏ chuột"** trên web → `cursor=hide`
+- **Chụp ảnh**: ẩn con trỏ bằng cách bỏ cờ `-C` của `screencapture` (full/vùng); cửa sổ luôn ẩn (chế độ `-i` không nhận `-C`)
+- **Quay video**: `SCStreamConfiguration.showsCursor=false` — nhưng **Ventura 13.4 không tôn trọng** (chỉ hiệu lực từ macOS 14), xem mục Lỗi đã gặp
+- Thay thế: **đếm ngược 3-2-1** (`Countdown.swift`) trước khi quay video — overlay không chặn chuột, tắt trước khi quay → kịp đưa con trỏ ra chỗ khuất, không lọt vào video
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.3
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -177,6 +184,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | VieNeu crash khi khởi động — `ModuleNotFoundError: trafilatura` / `llama_cpp` | Minimal install thiếu dependency | Cài thêm `trafilatura` + `llama-cpp-python` (cần `cmake build-essential g++` để compile) trong Dockerfile |
 | VieNeu báo `No file found ... VieNeu-TTS-v2-Q4-K-M.gguf` | Model trên HF đổi tên file GGUF | `sed` đổi filename trong `src/vieneu/standard.py` thành `VieNeu-TTS-0.3B-ngoc-huyen-Q4_0.gguf` |
 | Audio TTS đọc cả câu reference + lặp lại | `use_chat_format` chỉ bật cho repo v1; bản fine-tune 0.3B dùng sai định dạng prompt → đọc ref text + lặp (308 tokens/6s thay vì 74/1.5s) | Đổi heuristic thành `"VieNeu-TTS" in backbone_repo`; dùng `infer()` thay `infer_stream()`. Patch qua `vieneu/fix_stream.py` |
+| Quay video không ẩn được con trỏ dù `showsCursor=false` | `SCStreamConfiguration.showsCursor` chỉ có tác dụng từ macOS 14; Ventura 13.4 bỏ qua (đã xác nhận qua log: showsCursor=false nhưng con trỏ vẫn hiện) | Giữ `showsCursor=false` (đúng chuẩn, tự chạy khi lên macOS 14+); thêm **đếm ngược 3-2-1** để người dùng tự giấu con trỏ |
 | Native app "đã cấp quyền nhưng vẫn báo chưa" / toggle Settings cũ không tự tắt | Ký **ad-hoc** đổi identity mỗi build → quyền TCC gắn identity cũ, bản mới không khớp | Tạo **self-signed cert** ổn định (`make-cert.sh`, OpenSSL 3 cần `-legacy` cho PKCS12); `tccutil reset ScreenCapture com.gostudio.capture` |
 | Quay video không ra file (lịch sử trống) | Cast `SCStreamFrameInfo` status thất bại → loại sạch mọi frame → file rỗng → không upload | Bắt đầu writer session ngay frame đầu; chỉ bỏ frame khi đọc được status và ≠ `.complete` |
 | Lần bấm quay thứ 2 vô tình dừng bản quay 1 | App single-shot nhưng instance cũ còn chạy, URL mới route về nó; nút Bắt đầu rơi vào state `.recording` | Bỏ qua URL mới khi đang quay/lưu; đóng panel = thoát app; nút ⏹ menu bar luôn dừng được |
@@ -186,9 +194,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.3.2
+- Ổn định v1.3.3
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.2
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.3
 
 ---
 
@@ -232,3 +240,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.3.0 | Quay màn hình & chụp ảnh macOS qua native app (ScreenCaptureKit, scheme `gostudio://`) |
 | v1.3.1 | Chọn cửa sổ cho chụp ảnh (`-i -w`) & quay video (dropdown + `SCContentFilter`) |
 | v1.3.2 | Chọn vùng với kính lúp phóng to (overlay tự dựng) cho ảnh + video, crop FFmpeg |
+| v1.3.3 | Ẩn con trỏ khi chụp ảnh + đếm ngược 3-2-1 trước khi quay video |

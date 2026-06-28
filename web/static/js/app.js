@@ -146,6 +146,7 @@ document.getElementById('ttsForm').addEventListener('submit', async e => {
 // ── Quay màn hình / Chụp ảnh (macOS native app) ───────────────
 const capRegion     = document.getElementById('capRegion');
 const capAudio      = document.getElementById('capAudio');
+const capHideCursor = document.getElementById('capHideCursor');
 const screenshotBtn = document.getElementById('screenshotBtn');
 const recordBtn     = document.getElementById('recordBtn');
 const capHint       = document.getElementById('capHint');
@@ -157,6 +158,7 @@ function launchCapture(mode) {
 
     const params = new URLSearchParams({ mode, region: capRegion.value });
     if (mode === 'video') params.set('audio', capAudio.value);
+    if (capHideCursor.checked) params.set('cursor', 'hide');
     window.location.href = 'gostudio://capture?' + params.toString();
 
     capHint.classList.remove('hidden');
