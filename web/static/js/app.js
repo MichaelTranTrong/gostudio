@@ -7,6 +7,7 @@ document.querySelectorAll('nav a[data-tab]').forEach(link => {
     link.classList.add('active');
     document.getElementById('tab-mp4').classList.toggle('hidden', tab !== 'mp4');
     document.getElementById('tab-tts').classList.toggle('hidden', tab !== 'tts');
+    document.getElementById('tab-capture').classList.toggle('hidden', tab !== 'capture');
     if (tab === 'tts') loadVoices();
   });
 });
@@ -142,6 +143,50 @@ document.getElementById('ttsForm').addEventListener('submit', async e => {
   pollJob(jobId, ttsProgressFill, ttsStatusText, ttsProgressEl, ttsResultEl, ttsDownloadLink, ttsSubmitBtn);
 });
 
+// ── Quay màn hình / Chụp ảnh (macOS native app) ───────────────
+const capRegion     = document.getElementById('capRegion');
+const capAudio      = document.getElementById('capAudio');
+const screenshotBtn = document.getElementById('screenshotBtn');
+const recordBtn     = document.getElementById('recordBtn');
+const capHint       = document.getElementById('capHint');
+
+function launchCapture(mode) {
+  // Số job hiện tại để phát hiện job mới xuất hiện sau khi capture.
+  fetch('/api/jobs').then(r => r.json()).then(jobs => {
+    const before = (jobs || []).length;
+
+    const params = new URLSearchParams({ mode, region: capRegion.value });
+    if (mode === 'video') params.set('audio', capAudio.value);
+    window.location.href = 'gostudio://capture?' + params.toString();
+
+    capHint.classList.remove('hidden');
+    capHint.textContent = '📂 Đã mở app GoStudio Capture — bấm "Bắt đầu" trong app để ' +
+      (mode === 'video' ? 'quay.' : 'chụp.') + ' File sẽ tự về lịch sử bên dưới.';
+
+    // Theo dõi tới 3 phút (đủ thời gian cấp quyền + quay). Hết giờ chỉ nhắc nhẹ.
+    let waited = 0;
+    const iv = setInterval(async () => {
+      waited += 2;
+      try {
+        const now = await (await fetch('/api/jobs')).json();
+        if ((now || []).length > before) {
+          clearInterval(iv);
+          capHint.textContent = '✅ Đã nhận file, xem trong lịch sử bên dưới.';
+          loadHistory();
+          return;
+        }
+      } catch {}
+      if (waited >= 180) {
+        clearInterval(iv);
+        capHint.innerHTML = 'ℹ️ Chưa nhận được file. Nếu app không mở, kiểm tra đã cài <strong>GoStudio Capture</strong> chưa.';
+      }
+    }, 2000);
+  });
+}
+
+screenshotBtn.addEventListener('click', () => launchCapture('screenshot'));
+recordBtn.addEventListener('click', () => launchCapture('video'));
+
 // ── Shared poll ───────────────────────────────────────────────
 function pollJob(jobId, fill, statusEl, progressContainer, resultContainer, dlLink, btn) {
   const interval = setInterval(async () => {
@@ -182,13 +227,9 @@ async function loadHistory() {
     jobBody.innerHTML = '';
     (jobs || []).forEach(j => {
       const tr = document.createElement('tr');
-      const isTTS = j.type === 'text_to_speech';
-      const displayName = isTTS
-        ? j.input_file.replace('[TTS] ', '')
-        : j.input_file.split('/').pop().replace(/^\d+_/, '');
-      const typeLabel = isTTS
-        ? '<span class="badge badge-tts">TTS</span>'
-        : '<span class="badge badge-mp4">MP4</span>';
+      const meta = jobMeta(j);
+      const displayName = meta.name;
+      const typeLabel = meta.badge;
       const date = new Date(j.created_at).toLocaleString('vi-VN');
       const dl = j.status === 'done'
         ? `<a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>`
@@ -219,6 +260,20 @@ deleteAllBtn.addEventListener('click', async () => {
   await fetch('/api/jobs', { method: 'DELETE' });
   loadHistory();
 });
+
+// Tên hiển thị + badge loại job tùy theo type.
+function jobMeta(j) {
+  switch (j.type) {
+    case 'text_to_speech':
+      return { name: j.input_file.replace('[TTS] ', ''), badge: '<span class="badge badge-tts">TTS</span>' };
+    case 'screenshot':
+      return { name: j.input_file.replace('[Ảnh] ', ''), badge: '<span class="badge badge-photo">Ảnh</span>' };
+    case 'screen_record':
+      return { name: j.input_file.replace('[Quay] ', ''), badge: '<span class="badge badge-screen">Quay</span>' };
+    default:
+      return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-mp4">MP4</span>' };
+  }
+}
 
 function labelStatus(s) {
   return { pending: 'Chờ', processing: 'Đang xử lý', done: 'Hoàn thành', failed: 'Lỗi' }[s] || s;

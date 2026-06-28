@@ -187,6 +187,18 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
+- [ ] Quay màn hình + chụp ảnh macOS qua native app (kích hoạt từ web bằng `gostudio://`, upload về job pipeline) — xem [bản phác kiến trúc](docs/screen-capture-design.md)
+
+---
+
+## Đang làm: Quay màn hình & chụp ảnh macOS
+
+Thiết kế: [docs/screen-capture-design.md](docs/screen-capture-design.md). Khung end-to-end **đã dựng xong**, chờ chạy thử thật trên máy.
+
+- **Backend** (`internal/handlers/capture.go`): `POST /api/capture/upload` nhận ảnh/video từ native app, job type `screenshot`/`screen_record`, `.mov`→`.mp4` (FFmpeg). Download content-type theo đuôi file. Đã verify bằng curl.
+- **Native app** (`macos-capture/`): Swift app dùng-một-lần, scheme `gostudio://capture?mode=...`, ScreenCaptureKit (video) + `screencapture` (ảnh), tự xin quyền + relaunch, upload rồi tự thoát. Build bằng `macos-capture/build.sh` (compile sạch, scheme đã đăng ký). Ký **ad-hoc** — self-signed cert gác lại.
+- **Web** (`web/`): tab "Quay màn hình" phát `gostudio://`, badge lịch sử Ảnh/Quay, phát hiện "chưa cài app".
+- **Còn lại:** chạy thử thật (cấp quyền lần đầu), TODO region video/mic/retina, ký self-signed.
 
 ---
 

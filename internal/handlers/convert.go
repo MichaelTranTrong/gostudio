@@ -145,6 +145,26 @@ func DownloadOutput(c *gin.Context) {
 	fileName := filepath.Base(job.OutputFile)
 	encoded := url.PathEscape(fileName)
 	c.Header("Content-Disposition", `attachment; filename="`+fileName+`"; filename*=UTF-8''`+encoded)
-	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Content-Type", contentTypeFor(fileName))
 	c.File(job.OutputFile)
+}
+
+// contentTypeFor đoán MIME từ phần mở rộng (audio/video/ảnh).
+func contentTypeFor(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".wav":
+		return "audio/wav"
+	case ".mp4":
+		return "video/mp4"
+	case ".mov":
+		return "video/quicktime"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	default:
+		return "application/octet-stream"
+	}
 }

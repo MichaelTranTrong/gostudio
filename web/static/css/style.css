@@ -147,6 +147,11 @@ tr:last-child td { border-bottom: none; }
 .badge-failed     { background: rgba(255,101,132,0.15); color: var(--accent2); }
 .badge-mp4        { background: rgba(108,99,255,0.12); color: var(--accent); }
 .badge-tts        { background: rgba(255,101,132,0.12); color: var(--accent2); }
+.badge-photo      { background: rgba(76,175,144,0.12); color: var(--success); }
+.badge-screen     { background: rgba(255,200,0,0.12);  color: #ffc800; }
+
+.capture-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.capture-status { margin-top: 14px; }
 
 .dl-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 .dl-link:hover { text-decoration: underline; }
