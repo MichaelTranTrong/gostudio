@@ -132,6 +132,15 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Fix qua `vieneu/fix_stream.py` (chạy lúc build image), xem mục Lỗi đã gặp
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.2.1
 
+### 14. v1.3.0 — Quay màn hình & chụp ảnh macOS (native app)
+- Web kích hoạt app native macOS qua URL scheme `gostudio://capture?mode=...`, app quay/chụp rồi upload về Go Studio (tái dùng job pipeline + lịch sử)
+- **Backend** (`internal/handlers/capture.go`): `POST /api/capture/upload` nhận ảnh/video, job type `screenshot`/`screen_record`, `.mov`→`.mp4`, download content-type theo đuôi file
+- **Native app** (`macos-capture/`): Swift dùng-một-lần — ScreenCaptureKit (video + system audio) + `screencapture` (ảnh). Panel điều khiển, xin quyền khi bấm Bắt đầu + tự relaunch. Quay video: ẩn UI, dừng bằng nút ⏹ trên thanh menu (giống macOS)
+- Ký **self-signed cert** (`make-cert.sh`) để quyền Screen Recording dính vĩnh viễn qua các lần build
+- **Web**: tab "Quay màn hình" phát `gostudio://`, badge lịch sử Ảnh/Quay
+- Thiết kế chi tiết: [docs/screen-capture-design.md](docs/screen-capture-design.md)
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.0
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -152,14 +161,18 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | VieNeu crash khi khởi động — `ModuleNotFoundError: trafilatura` / `llama_cpp` | Minimal install thiếu dependency | Cài thêm `trafilatura` + `llama-cpp-python` (cần `cmake build-essential g++` để compile) trong Dockerfile |
 | VieNeu báo `No file found ... VieNeu-TTS-v2-Q4-K-M.gguf` | Model trên HF đổi tên file GGUF | `sed` đổi filename trong `src/vieneu/standard.py` thành `VieNeu-TTS-0.3B-ngoc-huyen-Q4_0.gguf` |
 | Audio TTS đọc cả câu reference + lặp lại | `use_chat_format` chỉ bật cho repo v1; bản fine-tune 0.3B dùng sai định dạng prompt → đọc ref text + lặp (308 tokens/6s thay vì 74/1.5s) | Đổi heuristic thành `"VieNeu-TTS" in backbone_repo`; dùng `infer()` thay `infer_stream()`. Patch qua `vieneu/fix_stream.py` |
+| Native app "đã cấp quyền nhưng vẫn báo chưa" / toggle Settings cũ không tự tắt | Ký **ad-hoc** đổi identity mỗi build → quyền TCC gắn identity cũ, bản mới không khớp | Tạo **self-signed cert** ổn định (`make-cert.sh`, OpenSSL 3 cần `-legacy` cho PKCS12); `tccutil reset ScreenCapture com.gostudio.capture` |
+| Quay video không ra file (lịch sử trống) | Cast `SCStreamFrameInfo` status thất bại → loại sạch mọi frame → file rỗng → không upload | Bắt đầu writer session ngay frame đầu; chỉ bỏ frame khi đọc được status và ≠ `.complete` |
+| Lần bấm quay thứ 2 vô tình dừng bản quay 1 | App single-shot nhưng instance cũ còn chạy, URL mới route về nó; nút Bắt đầu rơi vào state `.recording` | Bỏ qua URL mới khi đang quay/lưu; đóng panel = thoát app; nút ⏹ menu bar luôn dừng được |
+| Phím tắt toàn cục (Carbon `RegisterEventHotKey`) không kích hoạt | Đăng ký `status=0` nhưng sự kiện không tới app helper kiểu này (xác nhận qua log: handler không chạy) | Bỏ phím tắt; dùng nút ⏹ trên thanh menu (đúng cách macOS dừng quay) |
 
 ---
 
 ## Đang làm
 
-- Ổn định v1.2.1
+- Ổn định v1.3.0
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.2.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.0
 
 ---
 
@@ -187,18 +200,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
-- [ ] Quay màn hình + chụp ảnh macOS qua native app (kích hoạt từ web bằng `gostudio://`, upload về job pipeline) — xem [bản phác kiến trúc](docs/screen-capture-design.md)
-
----
-
-## Đang làm: Quay màn hình & chụp ảnh macOS
-
-Thiết kế: [docs/screen-capture-design.md](docs/screen-capture-design.md). Khung end-to-end **đã dựng xong**, chờ chạy thử thật trên máy.
-
-- **Backend** (`internal/handlers/capture.go`): `POST /api/capture/upload` nhận ảnh/video từ native app, job type `screenshot`/`screen_record`, `.mov`→`.mp4` (FFmpeg). Download content-type theo đuôi file. Đã verify bằng curl.
-- **Native app** (`macos-capture/`): Swift app dùng-một-lần, scheme `gostudio://capture?mode=...`, ScreenCaptureKit (video) + `screencapture` (ảnh), tự xin quyền + relaunch, upload rồi tự thoát. Build bằng `macos-capture/build.sh` (compile sạch, scheme đã đăng ký). Ký **ad-hoc** — self-signed cert gác lại.
-- **Web** (`web/`): tab "Quay màn hình" phát `gostudio://`, badge lịch sử Ảnh/Quay, phát hiện "chưa cài app".
-- **Còn lại:** chạy thử thật (cấp quyền lần đầu), TODO region video/mic/retina, ký self-signed.
+- [ ] Quay video macOS: hỗ trợ region cửa sổ/vùng, thu micro, nhân scale Retina (hiện full-screen + system audio)
 
 ---
 
@@ -211,3 +213,4 @@ Thiết kế: [docs/screen-capture-design.md](docs/screen-capture-design.md). Kh
 | v1.1.1 | Xóa file vật lý (MP4 + MP3) khi xóa job, tránh chiếm dung lượng disk |
 | v1.2.0 | Chữ → Tiếng (TTS) với VieNeu-TTS, service Python riêng trong Docker |
 | v1.2.1 | Sửa lỗi TTS đọc câu reference + lặp lại (use_chat_format) |
+| v1.3.0 | Quay màn hình & chụp ảnh macOS qua native app (ScreenCaptureKit, scheme `gostudio://`) |
