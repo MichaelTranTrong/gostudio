@@ -169,6 +169,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Chỉ sửa frontend (`index.html`, `app.js`, `style.css`); mỗi tab con chỉ hiện điều khiển liên quan
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.4
 
+### 19. v1.4.0 — Xem ảnh/video/audio trực tiếp trong web
+- Trước đây file kết quả chỉ **tải về** (`Content-Disposition: attachment`); giờ thêm nút **👁 Xem** mở/phát ngay trong trình duyệt
+- **Backend** (`internal/handlers/convert.go`): tách `serveOutput(c, disposition)` dùng chung; `DownloadOutput`=`attachment`, thêm `PreviewOutput`=`inline`; route `GET /api/preview/:id`
+- **Frontend**: modal `#previewModal` hiển thị `<img>`/`<video>`/`<audio>` tùy loại job (`mediaKind()` suy từ `type`), autoplay; đóng bằng ✕ / click nền / Esc (xóa `innerHTML` để dừng phát)
+- Mỗi dòng lịch sử (`done`) có **👁 Xem** cạnh **⬇ Tải về**
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.4.0
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -199,9 +206,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.3.4
+- Ổn định v1.4.0
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.3.4
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.4.0
 
 ---
 
@@ -247,3 +254,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.3.2 | Chọn vùng với kính lúp phóng to (overlay tự dựng) cho ảnh + video, crop FFmpeg |
 | v1.3.3 | Ẩn con trỏ khi chụp ảnh + đếm ngược 3-2-1 trước khi quay video |
 | v1.3.4 | Tách Chụp ảnh / Quay video thành 2 tab con trong bảng điều khiển |
+| v1.4.0 | Xem ảnh/video/audio trực tiếp trong web (nút 👁 Xem + modal, `/api/preview/:id`) |

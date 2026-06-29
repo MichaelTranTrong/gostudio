@@ -240,4 +240,45 @@ select {
 }
 select:focus { border-color: var(--accent); }
 
+.dl-link + .dl-link { margin-left: 12px; }
+
+/* Modal xem trực tiếp */
+.modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7); }
+.modal-box {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 90vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.modal-close {
+  position: absolute; top: 10px; right: 12px;
+  background: none; border: none; color: var(--muted);
+  font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+.modal-close:hover { color: var(--accent2); background: rgba(255,101,132,0.1); }
+.modal-body {
+  display: flex; align-items: center; justify-content: center;
+  max-width: 100%;
+}
+.modal-body img, .modal-body video {
+  max-width: 82vw; max-height: 70vh;
+  border-radius: 10px; object-fit: contain;
+}
+.audio-wrap { text-align: center; min-width: 320px; }
+.audio-name { color: var(--text); font-weight: 600; margin-bottom: 16px; }
+.modal-body audio { width: 360px; max-width: 80vw; }
+
 .hidden { display: none !important; }

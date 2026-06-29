@@ -126,8 +126,19 @@ func JobList(c *gin.Context) {
 	c.JSON(http.StatusOK, jobs)
 }
 
-// DownloadOutput serves the converted file.
+// DownloadOutput serves the converted file as an attachment (tải về).
 func DownloadOutput(c *gin.Context) {
+	serveOutput(c, "attachment")
+}
+
+// PreviewOutput serves the converted file inline (xem/phát trực tiếp trong trình duyệt).
+func PreviewOutput(c *gin.Context) {
+	serveOutput(c, "inline")
+}
+
+// serveOutput resolves a done job's output file and serves it with the given
+// Content-Disposition (attachment = tải về, inline = mở xem trực tiếp).
+func serveOutput(c *gin.Context, disposition string) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
@@ -144,7 +155,7 @@ func DownloadOutput(c *gin.Context) {
 	}
 	fileName := filepath.Base(job.OutputFile)
 	encoded := url.PathEscape(fileName)
-	c.Header("Content-Disposition", `attachment; filename="`+fileName+`"; filename*=UTF-8''`+encoded)
+	c.Header("Content-Disposition", disposition+`; filename="`+fileName+`"; filename*=UTF-8''`+encoded)
 	c.Header("Content-Type", contentTypeFor(fileName))
 	c.File(job.OutputFile)
 }

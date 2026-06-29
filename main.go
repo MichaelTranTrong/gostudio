@@ -48,6 +48,7 @@ func main() {
 		api.DELETE("/jobs/:id", handlers.DeleteJob)
 		api.DELETE("/jobs", handlers.DeleteAllJobs)
 		api.GET("/download/:id", handlers.DownloadOutput)
+		api.GET("/preview/:id", handlers.PreviewOutput)
 	}
 
 	log.Println("Go Studio đang chạy tại http://localhost:2005")

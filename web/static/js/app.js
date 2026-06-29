@@ -249,7 +249,8 @@ async function loadHistory() {
       const typeLabel = meta.badge;
       const date = new Date(j.created_at).toLocaleString('vi-VN');
       const dl = j.status === 'done'
-        ? `<a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>`
+        ? `<a class="dl-link" href="#" data-view="${j.id}" data-kind="${mediaKind(j.type)}" data-name="${displayName}">👁 Xem</a>
+           <a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>`
         : '—';
       tr.innerHTML = `
         <td>${j.id}</td>
@@ -266,10 +267,56 @@ async function loadHistory() {
 }
 
 jobBody.addEventListener('click', async e => {
+  const view = e.target.closest('[data-view]');
+  if (view) {
+    e.preventDefault();
+    openPreview(view.dataset.view, view.dataset.kind, view.dataset.name);
+    return;
+  }
   const btn = e.target.closest('.btn-delete-row');
   if (!btn) return;
   await fetch('/api/jobs/' + btn.dataset.id, { method: 'DELETE' });
   loadHistory();
+});
+
+// ── Preview modal (xem ảnh / video / audio trực tiếp) ─────────
+const previewModal    = document.getElementById('previewModal');
+const previewBody     = document.getElementById('previewBody');
+const previewDownload = document.getElementById('previewDownload');
+
+// Loại media để chọn thẻ hiển thị, suy từ type của job.
+function mediaKind(type) {
+  switch (type) {
+    case 'screenshot':    return 'image';
+    case 'screen_record': return 'video';
+    default:              return 'audio'; // mp4_to_mp3, text_to_speech
+  }
+}
+
+function openPreview(id, kind, name) {
+  const src = '/api/preview/' + id;
+  let el;
+  if (kind === 'image') {
+    el = `<img src="${src}" alt="${name}"/>`;
+  } else if (kind === 'video') {
+    el = `<video src="${src}" controls autoplay></video>`;
+  } else {
+    el = `<div class="audio-wrap"><div class="audio-name">🎵 ${name}</div><audio src="${src}" controls autoplay></audio></div>`;
+  }
+  previewBody.innerHTML = el;
+  previewDownload.href = '/api/download/' + id;
+  previewModal.classList.remove('hidden');
+}
+
+function closePreview() {
+  previewModal.classList.add('hidden');
+  previewBody.innerHTML = ''; // dừng phát audio/video
+}
+
+document.getElementById('previewClose').addEventListener('click', closePreview);
+previewModal.querySelector('.modal-backdrop').addEventListener('click', closePreview);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !previewModal.classList.contains('hidden')) closePreview();
 });
 
 deleteAllBtn.addEventListener('click', async () => {
