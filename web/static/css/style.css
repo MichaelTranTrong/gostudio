@@ -240,7 +240,8 @@ select {
 }
 select:focus { border-color: var(--accent); }
 
-.dl-link + .dl-link { margin-left: 12px; }
+.row-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.dl-link { white-space: nowrap; }
 
 /* Modal xem trực tiếp */
 .modal {

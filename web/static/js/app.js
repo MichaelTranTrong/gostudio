@@ -249,8 +249,10 @@ async function loadHistory() {
       const typeLabel = meta.badge;
       const date = new Date(j.created_at).toLocaleString('vi-VN');
       const dl = j.status === 'done'
-        ? `<a class="dl-link" href="#" data-view="${j.id}" data-kind="${mediaKind(j.type)}" data-name="${displayName}">👁 Xem</a>
-           <a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>`
+        ? `<div class="row-actions">
+             <a class="dl-link" href="#" data-view="${j.id}" data-kind="${mediaKind(j.type)}" data-name="${displayName}">👁 Xem</a>
+             <a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>
+           </div>`
         : '—';
       tr.innerHTML = `
         <td>${j.id}</td>
