@@ -202,12 +202,12 @@ document.getElementById('trimForm').addEventListener('submit', async e => {
 
   let jobId;
   try {
-    const res = await fetch('/api/trim/video', { method: 'POST', body: fd });
+    const res = await fetch('/api/trim/media', { method: 'POST', body: fd });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Cắt video thất bại');
+    if (!res.ok) throw new Error(data.error || 'Cắt thất bại');
     jobId = data.job_id;
     trimProgressFill.style.width = '40%';
-    trimStatusText.textContent = 'Đang cắt video… (job #' + jobId + ')';
+    trimStatusText.textContent = 'Đang cắt… (job #' + jobId + ')';
   } catch (err) {
     trimStatusText.textContent = '❌ ' + err.message;
     trimSubmitBtn.disabled = false;
@@ -355,6 +355,7 @@ function mediaKind(type) {
     case 'screenshot':    return 'image';
     case 'screen_record': return 'video';
     case 'video_trim':    return 'video';
+    case 'audio_trim':    return 'audio';
     default:              return 'audio'; // mp4_to_mp3, text_to_speech
   }
 }
@@ -402,6 +403,8 @@ function jobMeta(j) {
       return { name: j.input_file.replace('[Quay] ', ''), badge: '<span class="badge badge-screen">Quay</span>' };
     case 'video_trim':
       return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-trim">Cắt</span>' };
+    case 'audio_trim':
+      return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-trim">Cắt audio</span>' };
     default:
       return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-mp4">MP4</span>' };
   }

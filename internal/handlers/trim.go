@@ -15,22 +15,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// videoExts là các định dạng video được chấp nhận để cắt.
+// videoExts / audioExts là các định dạng được chấp nhận để cắt.
 var videoExts = map[string]bool{
 	".mp4": true, ".mov": true, ".mkv": true, ".webm": true, ".avi": true, ".m4v": true,
 }
+var audioExts = map[string]bool{
+	".mp3": true, ".wav": true, ".m4a": true, ".aac": true, ".flac": true, ".ogg": true,
+}
 
-// TrimVideo cắt một đoạn video theo thời gian bắt đầu/kết thúc (chạy FFmpeg async).
-func TrimVideo(c *gin.Context) {
+// TrimMedia cắt một đoạn video hoặc audio theo thời gian (chạy FFmpeg async).
+func TrimMedia(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Vui lòng chọn file video"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Vui lòng chọn file video hoặc audio"})
 		return
 	}
 
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if !videoExts[ext] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng video không hỗ trợ"})
+	isAudio := audioExts[ext]
+	if !videoExts[ext] && !isAudio {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng không hỗ trợ"})
 		return
 	}
 
@@ -46,7 +50,7 @@ func TrimVideo(c *gin.Context) {
 		return
 	}
 
-	var duration float64 // 0 = cắt tới hết video
+	var duration float64 // 0 = cắt tới hết
 	if endStr != "" {
 		endSec, ok := parseTimecode(endStr)
 		if !ok {
@@ -71,22 +75,27 @@ func TrimVideo(c *gin.Context) {
 		return
 	}
 
-	jobID, err := models.CreateJob("video_trim", inputPath)
+	jobType := "video_trim"
+	if isAudio {
+		jobType = "audio_trim"
+	}
+	jobID, err := models.CreateJob(jobType, inputPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return
 	}
 
-	go runTrim(jobID, inputPath, baseName, startSec, duration)
+	go runTrim(jobID, inputPath, baseName, ext, startSec, duration)
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"job_id":  jobID,
-		"message": "Đang cắt video, hãy kiểm tra trạng thái",
+		"message": "Đang cắt, hãy kiểm tra trạng thái",
 	})
 }
 
-func runTrim(jobID uint64, inputPath, baseName string, startSec, duration float64) {
-	outputName := baseName + "_cat.mp4"
+func runTrim(jobID uint64, inputPath, baseName, srcExt string, startSec, duration float64) {
+	outExt, encodeArgs := trimEncodeArgs(srcExt)
+	outputName := baseName + "_cat" + outExt
 	outputPath := filepath.Join(outputDir, outputName)
 
 	_ = models.UpdateJob(jobID, "processing", "", "")
@@ -96,12 +105,8 @@ func runTrim(jobID uint64, inputPath, baseName string, startSec, duration float6
 	if duration > 0 {
 		args = append(args, "-t", strconv.FormatFloat(duration, 'f', 3, 64))
 	}
-	args = append(args,
-		"-c:v", "libx264", "-preset", "veryfast",
-		"-c:a", "aac",
-		"-movflags", "+faststart",
-		outputPath, "-y",
-	)
+	args = append(args, encodeArgs...)
+	args = append(args, outputPath, "-y")
 
 	cmd := exec.Command("ffmpeg", args...)
 	out, err := cmd.CombinedOutput()
@@ -113,6 +118,28 @@ func runTrim(jobID uint64, inputPath, baseName string, startSec, duration float6
 
 	_ = models.UpdateJob(jobID, "done", outputPath, "")
 	log.Printf("job %d trim done: %s", jobID, outputPath)
+}
+
+// trimEncodeArgs chọn đuôi file output + tham số encode theo định dạng nguồn.
+func trimEncodeArgs(srcExt string) (string, []string) {
+	switch srcExt {
+	case ".mp3":
+		return ".mp3", []string{"-c:a", "libmp3lame", "-q:a", "2"}
+	case ".wav":
+		return ".wav", []string{"-c:a", "pcm_s16le"}
+	case ".flac":
+		return ".flac", []string{"-c:a", "flac"}
+	case ".ogg":
+		return ".ogg", []string{"-c:a", "libvorbis"}
+	case ".m4a", ".aac":
+		return ".m4a", []string{"-c:a", "aac"}
+	default: // video → MP4 (H.264/AAC)
+		return ".mp4", []string{
+			"-c:v", "libx264", "-preset", "veryfast",
+			"-c:a", "aac",
+			"-movflags", "+faststart",
+		}
+	}
 }
 
 // parseTimecode chấp nhận "SS", "MM:SS", "HH:MM:SS" (cho phép phần thập phân) → tổng số giây.

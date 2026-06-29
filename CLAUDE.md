@@ -183,6 +183,12 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Lưu `input_file` = đường dẫn thật → xóa job dọn được cả file gốc
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.0
 
+### 21. v1.5.1 — Cắt cả audio (mở rộng tab Cắt)
+- Tab đổi tên **"Cắt video/audio"**, nhận thêm mp3/wav/m4a/aac/flac/ogg; route đổi `POST /api/trim/video` → **`/api/trim/media`**, handler `TrimVideo`→`TrimMedia`
+- Backend tự chọn codec/đuôi output theo nguồn (`trimEncodeArgs`): video→MP4 (H.264/AAC); mp3→libmp3lame, wav→pcm_s16le, flac→flac, ogg→libvorbis, m4a/aac→aac. Audio **giữ nguyên định dạng**
+- Job type tách `video_trim` / `audio_trim` để preview đúng kiểu (`mediaKind('audio_trim')`=audio); badge **Cắt** / **Cắt audio**
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.1
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -213,9 +219,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.5.0
+- Ổn định v1.5.1
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.1
 
 ---
 
@@ -236,7 +242,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## TODO tiếp theo
 
-- [x] Thêm tính năng cắt video (trim theo thời gian) — v1.5.0; còn lại: cắt audio, chọn thời gian bằng player trực quan
+- [x] Thêm tính năng cắt video/audio (trim theo thời gian) — v1.5.0 (video) + v1.5.1 (audio); còn lại: chọn thời gian bằng player trực quan
 - [ ] Thêm tính năng chuyển đổi định dạng khác (MP4→WAV, MP4→AAC, ...)
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
@@ -263,3 +269,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.3.4 | Tách Chụp ảnh / Quay video thành 2 tab con trong bảng điều khiển |
 | v1.4.0 | Xem ảnh/video/audio trực tiếp trong web (nút 👁 Xem + modal, `/api/preview/:id`) |
 | v1.5.0 | Cắt video theo thời gian (tab Cắt video, `/api/trim/video`, FFmpeg `-ss`/`-t`) |
+| v1.5.1 | Cắt cả audio (mp3/wav/m4a/aac/flac/ogg), route đổi `/api/trim/media`, giữ định dạng nguồn |

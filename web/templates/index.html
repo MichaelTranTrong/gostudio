@@ -12,7 +12,7 @@
   <nav>
     <a href="#" class="active" data-tab="mp4">MP4 → MP3</a>
     <a href="#" data-tab="tts">Chữ → Tiếng</a>
-    <a href="#" data-tab="trim">Cắt video</a>
+    <a href="#" data-tab="trim">Cắt video/audio</a>
     <a href="#" data-tab="capture">Quay màn hình</a>
   </nav>
 </header>
@@ -82,13 +82,13 @@
   <!-- Tab: Cắt video -->
   <div id="tab-trim" class="hidden">
     <section class="card">
-      <h2>Cắt Video Theo Thời Gian</h2>
-      <p class="hint">Tải lên video, nhập thời gian bắt đầu và kết thúc, hệ thống sẽ cắt đoạn đó ra (xuất MP4).</p>
+      <h2>Cắt Video / Audio Theo Thời Gian</h2>
+      <p class="hint">Tải lên video hoặc audio, nhập thời gian bắt đầu và kết thúc, hệ thống sẽ cắt đoạn đó ra (video → MP4, audio giữ nguyên định dạng).</p>
 
       <form id="trimForm" enctype="multipart/form-data">
         <div class="drop-zone" id="trimDropZone">
-          <span>Kéo thả video vào đây hoặc <span class="browse">chọn file</span></span>
-          <input type="file" id="trimFileInput" name="file" accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v" hidden/>
+          <span>Kéo thả video/audio vào đây hoặc <span class="browse">chọn file</span></span>
+          <input type="file" id="trimFileInput" name="file" accept="video/*,audio/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.mp3,.wav,.m4a,.aac,.flac,.ogg" hidden/>
           <div id="trimFileName" class="file-name"></div>
         </div>
 
@@ -104,7 +104,7 @@
         </div>
         <p class="hint">Định dạng thời gian: số giây (<code>90</code>) hoặc <code>MM:SS</code> / <code>HH:MM:SS</code>.</p>
 
-        <button type="submit" id="trimSubmitBtn" disabled>Cắt video</button>
+        <button type="submit" id="trimSubmitBtn" disabled>Cắt</button>
       </form>
 
       <div id="trimProgress" class="progress hidden">
@@ -113,8 +113,8 @@
       </div>
 
       <div id="trimResult" class="result hidden">
-        <p>✅ Cắt video thành công!</p>
-        <a id="trimDownloadLink" class="btn-download" href="#">Tải xuống MP4</a>
+        <p>✅ Cắt thành công!</p>
+        <a id="trimDownloadLink" class="btn-download" href="#">Tải xuống</a>
       </div>
     </section>
   </div>
