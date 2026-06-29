@@ -149,6 +149,32 @@ tr:last-child td { border-bottom: none; }
 .badge-tts        { background: rgba(255,101,132,0.12); color: var(--accent2); }
 .badge-photo      { background: rgba(76,175,144,0.12); color: var(--success); }
 .badge-screen     { background: rgba(255,200,0,0.12);  color: #ffc800; }
+.badge-trim       { background: rgba(139,128,255,0.14); color: #8b80ff; }
+
+/* Cắt video: hàng nhập thời gian */
+.time-row { display: flex; gap: 16px; margin-top: 20px; }
+.time-row .form-group { flex: 1; margin-bottom: 0; }
+.muted-note { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+input[type="text"] {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input[type="text"]:focus { border-color: var(--accent); }
+code {
+  background: var(--surface2);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.85em;
+  color: var(--accent);
+}
 
 .subtabs { display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 .subtab {

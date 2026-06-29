@@ -12,6 +12,7 @@
   <nav>
     <a href="#" class="active" data-tab="mp4">MP4 → MP3</a>
     <a href="#" data-tab="tts">Chữ → Tiếng</a>
+    <a href="#" data-tab="trim">Cắt video</a>
     <a href="#" data-tab="capture">Quay màn hình</a>
   </nav>
 </header>
@@ -74,6 +75,46 @@
       <div id="ttsResult" class="result hidden">
         <p>✅ Tạo giọng đọc thành công!</p>
         <a id="ttsDownloadLink" class="btn-download" href="#">Tải xuống MP3</a>
+      </div>
+    </section>
+  </div>
+
+  <!-- Tab: Cắt video -->
+  <div id="tab-trim" class="hidden">
+    <section class="card">
+      <h2>Cắt Video Theo Thời Gian</h2>
+      <p class="hint">Tải lên video, nhập thời gian bắt đầu và kết thúc, hệ thống sẽ cắt đoạn đó ra (xuất MP4).</p>
+
+      <form id="trimForm" enctype="multipart/form-data">
+        <div class="drop-zone" id="trimDropZone">
+          <span>Kéo thả video vào đây hoặc <span class="browse">chọn file</span></span>
+          <input type="file" id="trimFileInput" name="file" accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v" hidden/>
+          <div id="trimFileName" class="file-name"></div>
+        </div>
+
+        <div class="time-row">
+          <div class="form-group">
+            <label class="form-label">Bắt đầu</label>
+            <input type="text" id="trimStart" placeholder="0 hoặc 00:00:05" autocomplete="off"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Kết thúc <span class="muted-note">(để trống = tới hết)</span></label>
+            <input type="text" id="trimEnd" placeholder="00:00:30" autocomplete="off"/>
+          </div>
+        </div>
+        <p class="hint">Định dạng thời gian: số giây (<code>90</code>) hoặc <code>MM:SS</code> / <code>HH:MM:SS</code>.</p>
+
+        <button type="submit" id="trimSubmitBtn" disabled>Cắt video</button>
+      </form>
+
+      <div id="trimProgress" class="progress hidden">
+        <div class="progress-bar"><div class="progress-fill" id="trimProgressFill"></div></div>
+        <p id="trimStatusText">Đang xử lý…</p>
+      </div>
+
+      <div id="trimResult" class="result hidden">
+        <p>✅ Cắt video thành công!</p>
+        <a id="trimDownloadLink" class="btn-download" href="#">Tải xuống MP4</a>
       </div>
     </section>
   </div>

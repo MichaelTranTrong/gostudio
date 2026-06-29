@@ -176,6 +176,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Mỗi dòng lịch sử (`done`) có **👁 Xem** cạnh **⬇ Tải về**
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.4.0
 
+### 20. v1.5.0 — Cắt video theo thời gian
+- Tab mới **"Cắt video"**: upload video, nhập thời gian **Bắt đầu / Kết thúc**, FFmpeg cắt đoạn đó (xuất MP4), chạy async như các job khác
+- **Backend** (`internal/handlers/trim.go`): job type `video_trim`, route `POST /api/trim/video`; `parseTimecode` nhận giây / `MM:SS` / `HH:MM:SS`; cắt bằng `-ss` (trước `-i`, seek nhanh) + `-t duration`, **re-encode** (`libx264`+`aac`+`faststart`) để đúng frame; kết thúc trống = cắt tới hết
+- **Frontend**: drop-zone + 2 ô thời gian; dùng chung `pollJob`, lịch sử, nút **👁 Xem**/**⬇ Tải về**; badge **Cắt** (`badge-trim`), `mediaKind('video_trim')`=video
+- Lưu `input_file` = đường dẫn thật → xóa job dọn được cả file gốc
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.0
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -206,9 +213,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.4.0
+- Ổn định v1.5.0
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.4.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.0
 
 ---
 
@@ -229,7 +236,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## TODO tiếp theo
 
-- [ ] Thêm tính năng cắt audio/video (trim theo thời gian)
+- [x] Thêm tính năng cắt video (trim theo thời gian) — v1.5.0; còn lại: cắt audio, chọn thời gian bằng player trực quan
 - [ ] Thêm tính năng chuyển đổi định dạng khác (MP4→WAV, MP4→AAC, ...)
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
@@ -255,3 +262,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.3.3 | Ẩn con trỏ khi chụp ảnh + đếm ngược 3-2-1 trước khi quay video |
 | v1.3.4 | Tách Chụp ảnh / Quay video thành 2 tab con trong bảng điều khiển |
 | v1.4.0 | Xem ảnh/video/audio trực tiếp trong web (nút 👁 Xem + modal, `/api/preview/:id`) |
+| v1.5.0 | Cắt video theo thời gian (tab Cắt video, `/api/trim/video`, FFmpeg `-ss`/`-t`) |

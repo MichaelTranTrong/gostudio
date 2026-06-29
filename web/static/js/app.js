@@ -5,7 +5,7 @@ document.querySelectorAll('nav a[data-tab]').forEach(link => {
     const tab = link.dataset.tab;
     document.querySelectorAll('nav a[data-tab]').forEach(a => a.classList.remove('active'));
     link.classList.add('active');
-    ['mp4', 'tts', 'capture'].forEach(t => {
+    ['mp4', 'tts', 'trim', 'capture'].forEach(t => {
       document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
     });
     if (tab === 'tts') loadVoices();
@@ -154,6 +154,69 @@ document.getElementById('ttsForm').addEventListener('submit', async e => {
   pollJob(jobId, ttsProgressFill, ttsStatusText, ttsProgressEl, ttsResultEl, ttsDownloadLink, ttsSubmitBtn);
 });
 
+// ── Cắt video ─────────────────────────────────────────────────
+const trimDropZone   = document.getElementById('trimDropZone');
+const trimFileInput  = document.getElementById('trimFileInput');
+const trimFileName   = document.getElementById('trimFileName');
+const trimStart      = document.getElementById('trimStart');
+const trimEnd        = document.getElementById('trimEnd');
+const trimSubmitBtn  = document.getElementById('trimSubmitBtn');
+const trimProgressEl = document.getElementById('trimProgress');
+const trimProgressFill = document.getElementById('trimProgressFill');
+const trimStatusText = document.getElementById('trimStatusText');
+const trimResultEl   = document.getElementById('trimResult');
+const trimDownloadLink = document.getElementById('trimDownloadLink');
+
+let trimFile = null;
+
+trimDropZone.addEventListener('click', () => trimFileInput.click());
+trimDropZone.addEventListener('dragover', e => { e.preventDefault(); trimDropZone.classList.add('drag-over'); });
+trimDropZone.addEventListener('dragleave', () => trimDropZone.classList.remove('drag-over'));
+trimDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  trimDropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) setTrimFile(e.dataTransfer.files[0]);
+});
+trimFileInput.addEventListener('change', () => { if (trimFileInput.files[0]) setTrimFile(trimFileInput.files[0]); });
+
+function setTrimFile(f) {
+  trimFile = f;
+  trimFileName.textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
+  trimSubmitBtn.disabled = false;
+}
+
+document.getElementById('trimForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!trimFile) return;
+
+  trimSubmitBtn.disabled = true;
+  trimProgressEl.classList.remove('hidden');
+  trimResultEl.classList.add('hidden');
+  trimProgressFill.style.width = '20%';
+  trimStatusText.textContent = 'Đang tải file lên…';
+
+  const fd = new FormData();
+  fd.append('file', trimFile);
+  fd.append('start', trimStart.value.trim());
+  fd.append('end', trimEnd.value.trim());
+
+  let jobId;
+  try {
+    const res = await fetch('/api/trim/video', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Cắt video thất bại');
+    jobId = data.job_id;
+    trimProgressFill.style.width = '40%';
+    trimStatusText.textContent = 'Đang cắt video… (job #' + jobId + ')';
+  } catch (err) {
+    trimStatusText.textContent = '❌ ' + err.message;
+    trimSubmitBtn.disabled = false;
+    return;
+  }
+
+  pollJob(jobId, trimProgressFill, trimStatusText, trimProgressEl, trimResultEl, trimDownloadLink, trimSubmitBtn);
+});
+
 // ── Chụp ảnh / Quay video (macOS native app) ──────────────────
 function launchCapture(mode, paramObj, hintEl) {
   // Số job hiện tại để phát hiện job mới xuất hiện sau khi capture.
@@ -291,6 +354,7 @@ function mediaKind(type) {
   switch (type) {
     case 'screenshot':    return 'image';
     case 'screen_record': return 'video';
+    case 'video_trim':    return 'video';
     default:              return 'audio'; // mp4_to_mp3, text_to_speech
   }
 }
@@ -336,6 +400,8 @@ function jobMeta(j) {
       return { name: j.input_file.replace('[Ảnh] ', ''), badge: '<span class="badge badge-photo">Ảnh</span>' };
     case 'screen_record':
       return { name: j.input_file.replace('[Quay] ', ''), badge: '<span class="badge badge-screen">Quay</span>' };
+    case 'video_trim':
+      return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-trim">Cắt</span>' };
     default:
       return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-mp4">MP4</span>' };
   }
