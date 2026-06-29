@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -23,21 +24,9 @@ var audioExts = map[string]bool{
 	".mp3": true, ".wav": true, ".m4a": true, ".aac": true, ".flac": true, ".ogg": true,
 }
 
-// TrimMedia cắt một đoạn video hoặc audio theo thời gian (chạy FFmpeg async).
+// TrimMedia cắt một đoạn video/audio theo thời gian (chạy FFmpeg async).
+// Nguồn có thể là file upload mới (field "file") HOẶC một job có sẵn (field "source_id").
 func TrimMedia(c *gin.Context) {
-	file, err := c.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Vui lòng chọn file video hoặc audio"})
-		return
-	}
-
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	isAudio := audioExts[ext]
-	if !videoExts[ext] && !isAudio {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng không hỗ trợ"})
-		return
-	}
-
 	startStr := strings.TrimSpace(c.PostForm("start"))
 	endStr := strings.TrimSpace(c.PostForm("end"))
 	if startStr == "" {
@@ -64,22 +53,63 @@ func TrimMedia(c *gin.Context) {
 		duration = endSec - startSec
 	}
 
-	ts := time.Now().UnixMilli()
-	originalName, _ := url.QueryUnescape(filepath.Base(file.Filename))
-	baseName := strings.TrimSuffix(originalName, filepath.Ext(originalName))
-	inputName := fmt.Sprintf("%d_%s", ts, filepath.Base(file.Filename))
-	inputPath := filepath.Join(uploadDir, inputName)
+	var inputPath, ext, baseName, displayInput string
 
-	if err := c.SaveUploadedFile(file, inputPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể lưu file upload"})
-		return
+	if sourceID := strings.TrimSpace(c.PostForm("source_id")); sourceID != "" {
+		// Nguồn là một job có sẵn → dùng thẳng file output của nó làm input.
+		id, err := strconv.ParseUint(sourceID, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "source_id không hợp lệ"})
+			return
+		}
+		src, err := models.GetJob(id)
+		if err != nil || src.Status != "done" || src.OutputFile == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File nguồn chưa sẵn sàng"})
+			return
+		}
+		if _, err := os.Stat(src.OutputFile); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File nguồn không còn trên disk"})
+			return
+		}
+		inputPath = src.OutputFile
+		ext = strings.ToLower(filepath.Ext(inputPath))
+		if !videoExts[ext] && !audioExts[ext] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng nguồn không cắt được"})
+			return
+		}
+		base := filepath.Base(inputPath)
+		baseName = strings.TrimSuffix(base, filepath.Ext(base))
+		// Nhãn (không phải path thật) → xóa job cắt không đụng vào file nguồn.
+		displayInput = "[Cắt] " + base
+	} else {
+		// Nguồn là file upload mới.
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Vui lòng chọn file video hoặc audio"})
+			return
+		}
+		ext = strings.ToLower(filepath.Ext(file.Filename))
+		if !videoExts[ext] && !audioExts[ext] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Định dạng không hỗ trợ"})
+			return
+		}
+		ts := time.Now().UnixMilli()
+		originalName, _ := url.QueryUnescape(filepath.Base(file.Filename))
+		baseName = strings.TrimSuffix(originalName, filepath.Ext(originalName))
+		inputName := fmt.Sprintf("%d_%s", ts, filepath.Base(file.Filename))
+		inputPath = filepath.Join(uploadDir, inputName)
+		if err := c.SaveUploadedFile(file, inputPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể lưu file upload"})
+			return
+		}
+		displayInput = inputPath // path thật → xóa job dọn được file gốc
 	}
 
 	jobType := "video_trim"
-	if isAudio {
+	if audioExts[ext] {
 		jobType = "audio_trim"
 	}
-	jobID, err := models.CreateJob(jobType, inputPath)
+	jobID, err := models.CreateJob(jobType, displayInput)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return
@@ -95,8 +125,7 @@ func TrimMedia(c *gin.Context) {
 
 func runTrim(jobID uint64, inputPath, baseName, srcExt string, startSec, duration float64) {
 	outExt, encodeArgs := trimEncodeArgs(srcExt)
-	outputName := baseName + "_cat" + outExt
-	outputPath := filepath.Join(outputDir, outputName)
+	outputPath := uniqueOutputPath(baseName+"_cat", outExt)
 
 	_ = models.UpdateJob(jobID, "processing", "", "")
 
@@ -118,6 +147,21 @@ func runTrim(jobID uint64, inputPath, baseName, srcExt string, startSec, duratio
 
 	_ = models.UpdateJob(jobID, "done", outputPath, "")
 	log.Printf("job %d trim done: %s", jobID, outputPath)
+}
+
+// uniqueOutputPath trả về đường dẫn chưa tồn tại trong outputDir (tránh ghi đè khi
+// cắt nhiều lần cùng một file): base.ext, rồi base-2.ext, base-3.ext, …
+func uniqueOutputPath(base, ext string) string {
+	p := filepath.Join(outputDir, base+ext)
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return p
+	}
+	for i := 2; ; i++ {
+		p = filepath.Join(outputDir, fmt.Sprintf("%s-%d%s", base, i, ext))
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			return p
+		}
+	}
 }
 
 // trimEncodeArgs chọn đuôi file output + tham số encode theo định dạng nguồn.

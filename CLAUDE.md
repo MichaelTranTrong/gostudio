@@ -196,6 +196,14 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Chỉ sửa frontend (`index.html`, `app.js`, `style.css`); backend `/api/trim/media` giữ nguyên (vẫn đọc 2 ô start/end)
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.2
 
+### 23. v1.5.3 — Cắt cả file đang có sẵn trong app (từ lịch sử)
+- Mỗi dòng lịch sử audio/video (không phải ảnh) có nút **✂ Cắt** → mở tab Cắt, nạp file qua `/api/preview/:id` vào player (server hỗ trợ range nên tua được), chọn đoạn như upload
+- **Backend** (`trim.go`): `TrimMedia` nhận thêm field **`source_id`** (id job nguồn) → đọc thẳng `OutputFile` làm input, **không copy lại**; ext suy từ file nguồn
+- Job cắt-từ-nguồn lưu `input_file` = **nhãn `[Cắt] <tên>`** (không phải path thật) → xóa job này **không đụng file nguồn**; `trimName()` ở frontend bỏ nhãn khi hiển thị
+- Thêm `uniqueOutputPath` (base, base-2, base-3…) → cắt cùng file nhiều lần không ghi đè (xong luôn TODO trùng tên output)
+- **Frontend**: state `trimSourceId`; chọn file mới thì bỏ nguồn-từ-lịch-sử; `loadTrimPlayerSrc(url, isVideo)` tách dùng chung; submit gửi `source_id` hoặc `file`
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.3
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -226,9 +234,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.5.2
+- Ổn định v1.5.3
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.2
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.3
 
 ---
 
@@ -253,7 +261,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Thêm tính năng chuyển đổi định dạng khác (MP4→WAV, MP4→AAC, ...)
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
-- [ ] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại)
+- [x] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại) — `uniqueOutputPath` cho job cắt (v1.5.3); các job khác chưa áp dụng
 - [ ] Tự động xóa file upload/output sau N ngày
 - [ ] Thêm xác thực người dùng (login)
 - [ ] Quay video macOS: thu micro, nhân scale Retina (cửa sổ + vùng đã xong ở v1.3.1/v1.3.2)
@@ -278,3 +286,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.5.0 | Cắt video theo thời gian (tab Cắt video, `/api/trim/video`, FFmpeg `-ss`/`-t`) |
 | v1.5.1 | Cắt cả audio (mp3/wav/m4a/aac/flac/ogg), route đổi `/api/trim/media`, giữ định dạng nguồn |
 | v1.5.2 | Chọn thời gian cắt bằng player trực quan (timeline 2 tay kéo, playhead, xem thử đoạn) |
+| v1.5.3 | Cắt cả file có sẵn trong app (nút ✂ Cắt ở lịch sử, `source_id`, chống trùng tên output) |

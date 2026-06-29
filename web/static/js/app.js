@@ -168,6 +168,7 @@ const trimResultEl   = document.getElementById('trimResult');
 const trimDownloadLink = document.getElementById('trimDownloadLink');
 
 let trimFile = null;
+let trimSourceId = null; // nếu cắt từ file có sẵn trong lịch sử
 
 trimDropZone.addEventListener('click', () => trimFileInput.click());
 trimDropZone.addEventListener('dragover', e => { e.preventDefault(); trimDropZone.classList.add('drag-over'); });
@@ -181,9 +182,23 @@ trimFileInput.addEventListener('change', () => { if (trimFileInput.files[0]) set
 
 function setTrimFile(f) {
   trimFile = f;
+  trimSourceId = null; // chọn file mới → bỏ nguồn-từ-lịch-sử
   trimFileName.textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
   trimSubmitBtn.disabled = false;
   loadTrimPlayer(f);
+}
+
+// Nạp một file có sẵn trong lịch sử vào tab Cắt (qua /api/preview/:id, hỗ trợ tua).
+function loadTrimFromJob(id, kind, name) {
+  if (trimObjectURL) { URL.revokeObjectURL(trimObjectURL); trimObjectURL = null; }
+  trimSourceId = id;
+  trimFile = null;
+  trimFileName.textContent = name + ' (từ lịch sử)';
+  trimSubmitBtn.disabled = false;
+  trimStart.value = '';
+  trimEnd.value = '';
+  document.querySelector('nav a[data-tab="trim"]').click(); // chuyển sang tab Cắt
+  loadTrimPlayerSrc('/api/preview/' + id, kind === 'video');
 }
 
 // ── Player trực quan + timeline chọn đoạn ─────────────────────
@@ -203,13 +218,18 @@ let trimDuration = 0, selStart = 0, selEnd = 0, previewStopAt = null;
 
 function loadTrimPlayer(f) {
   if (trimObjectURL) URL.revokeObjectURL(trimObjectURL);
-  trimMediaHolder.innerHTML = '';
-  previewStopAt = null;
-
   const isVideo = (f.type && f.type.startsWith('video')) || /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(f.name);
   trimObjectURL = URL.createObjectURL(f);
+  loadTrimPlayerSrc(trimObjectURL, isVideo);
+}
+
+function loadTrimPlayerSrc(src, isVideo) {
+  trimMediaHolder.innerHTML = '';
+  previewStopAt = null;
+  trimDuration = 0;
+
   trimMediaEl = document.createElement(isVideo ? 'video' : 'audio');
-  trimMediaEl.src = trimObjectURL;
+  trimMediaEl.src = src;
   trimMediaEl.controls = true;
   trimMediaEl.preload = 'metadata';
   trimMediaHolder.appendChild(trimMediaEl);
@@ -340,16 +360,17 @@ function parseTimeJS(str) {
 
 document.getElementById('trimForm').addEventListener('submit', async e => {
   e.preventDefault();
-  if (!trimFile) return;
+  if (!trimFile && !trimSourceId) return;
 
   trimSubmitBtn.disabled = true;
   trimProgressEl.classList.remove('hidden');
   trimResultEl.classList.add('hidden');
   trimProgressFill.style.width = '20%';
-  trimStatusText.textContent = 'Đang tải file lên…';
+  trimStatusText.textContent = trimSourceId ? 'Đang gửi yêu cầu…' : 'Đang tải file lên…';
 
   const fd = new FormData();
-  fd.append('file', trimFile);
+  if (trimSourceId) fd.append('source_id', trimSourceId);
+  else fd.append('file', trimFile);
   fd.append('start', trimStart.value.trim());
   fd.append('end', trimEnd.value.trim());
 
@@ -464,9 +485,14 @@ async function loadHistory() {
       const displayName = meta.name;
       const typeLabel = meta.badge;
       const date = new Date(j.created_at).toLocaleString('vi-VN');
+      const kind = mediaKind(j.type);
+      const trimLink = kind !== 'image'
+        ? `<a class="dl-link" href="#" data-trim="${j.id}" data-kind="${kind}" data-name="${displayName}">✂ Cắt</a>`
+        : '';
       const dl = j.status === 'done'
         ? `<div class="row-actions">
-             <a class="dl-link" href="#" data-view="${j.id}" data-kind="${mediaKind(j.type)}" data-name="${displayName}">👁 Xem</a>
+             <a class="dl-link" href="#" data-view="${j.id}" data-kind="${kind}" data-name="${displayName}">👁 Xem</a>
+             ${trimLink}
              <a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>
            </div>`
         : '—';
@@ -489,6 +515,12 @@ jobBody.addEventListener('click', async e => {
   if (view) {
     e.preventDefault();
     openPreview(view.dataset.view, view.dataset.kind, view.dataset.name);
+    return;
+  }
+  const trim = e.target.closest('[data-trim]');
+  if (trim) {
+    e.preventDefault();
+    loadTrimFromJob(trim.dataset.trim, trim.dataset.kind, trim.dataset.name);
     return;
   }
   const btn = e.target.closest('.btn-delete-row');
@@ -555,12 +587,17 @@ function jobMeta(j) {
     case 'screen_record':
       return { name: j.input_file.replace('[Quay] ', ''), badge: '<span class="badge badge-screen">Quay</span>' };
     case 'video_trim':
-      return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-trim">Cắt</span>' };
+      return { name: trimName(j.input_file), badge: '<span class="badge badge-trim">Cắt</span>' };
     case 'audio_trim':
-      return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-trim">Cắt audio</span>' };
+      return { name: trimName(j.input_file), badge: '<span class="badge badge-trim">Cắt audio</span>' };
     default:
       return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-mp4">MP4</span>' };
   }
+}
+
+// Tên hiển thị cho job cắt: bỏ nhãn "[Cắt] " (nguồn từ lịch sử) hoặc tiền tố timestamp (upload).
+function trimName(input) {
+  return input.replace(/^\[Cắt\] /, '').split('/').pop().replace(/^\d+_/, '');
 }
 
 function labelStatus(s) {
