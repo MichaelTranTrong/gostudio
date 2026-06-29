@@ -183,6 +183,159 @@ function setTrimFile(f) {
   trimFile = f;
   trimFileName.textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(2) + ' MB)';
   trimSubmitBtn.disabled = false;
+  loadTrimPlayer(f);
+}
+
+// ── Player trực quan + timeline chọn đoạn ─────────────────────
+const trimPlayerWrap  = document.getElementById('trimPlayerWrap');
+const trimMediaHolder = document.getElementById('trimMediaHolder');
+const tlTrack       = document.getElementById('tlTrack');
+const tlRange       = document.getElementById('tlRange');
+const tlPlayhead    = document.getElementById('tlPlayhead');
+const tlStartHandle = document.getElementById('tlStart');
+const tlEndHandle   = document.getElementById('tlEnd');
+const tlStartLabel  = document.getElementById('tlStartLabel');
+const tlEndLabel    = document.getElementById('tlEndLabel');
+const tlPreviewBtn  = document.getElementById('tlPreviewBtn');
+
+let trimMediaEl = null, trimObjectURL = null;
+let trimDuration = 0, selStart = 0, selEnd = 0, previewStopAt = null;
+
+function loadTrimPlayer(f) {
+  if (trimObjectURL) URL.revokeObjectURL(trimObjectURL);
+  trimMediaHolder.innerHTML = '';
+  previewStopAt = null;
+
+  const isVideo = (f.type && f.type.startsWith('video')) || /\.(mp4|mov|mkv|webm|avi|m4v)$/i.test(f.name);
+  trimObjectURL = URL.createObjectURL(f);
+  trimMediaEl = document.createElement(isVideo ? 'video' : 'audio');
+  trimMediaEl.src = trimObjectURL;
+  trimMediaEl.controls = true;
+  trimMediaEl.preload = 'metadata';
+  trimMediaHolder.appendChild(trimMediaEl);
+  trimPlayerWrap.classList.remove('hidden');
+
+  trimMediaEl.addEventListener('loadedmetadata', () => {
+    trimDuration = trimMediaEl.duration || 0;
+    selStart = 0;
+    selEnd = trimDuration;
+    renderTimeline();
+    writeInputs();
+  });
+  trimMediaEl.addEventListener('timeupdate', () => {
+    updatePlayhead();
+    if (previewStopAt !== null && trimMediaEl.currentTime >= previewStopAt) {
+      trimMediaEl.pause();
+      previewStopAt = null;
+    }
+  });
+}
+
+const tlPct = sec => (trimDuration > 0 ? (sec / trimDuration) * 100 : 0);
+
+function renderTimeline() {
+  const a = tlPct(selStart), b = tlPct(selEnd);
+  tlStartHandle.style.left = a + '%';
+  tlEndHandle.style.left = b + '%';
+  tlRange.style.left = a + '%';
+  tlRange.style.width = (b - a) + '%';
+  tlStartLabel.textContent = fmtTime(selStart);
+  tlEndLabel.textContent = fmtTime(selEnd);
+  updatePlayhead();
+}
+
+function updatePlayhead() {
+  if (trimMediaEl && trimDuration) tlPlayhead.style.left = tlPct(trimMediaEl.currentTime) + '%';
+}
+
+// Ghi giá trị về 2 ô input (backend đọc từ đây). End ở cuối video → để trống = cắt tới hết.
+function writeInputs() {
+  trimStart.value = fmtTimecode(selStart);
+  trimEnd.value = selEnd < trimDuration - 0.05 ? fmtTimecode(selEnd) : '';
+}
+
+function timeFromClientX(clientX) {
+  const rect = tlTrack.getBoundingClientRect();
+  const r = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  return r * trimDuration;
+}
+
+function makeDrag(which) {
+  return e => {
+    if (!trimDuration) return;
+    e.preventDefault();
+    const move = ev => {
+      const t = timeFromClientX(ev.clientX);
+      if (which === 'start') selStart = Math.max(0, Math.min(t, selEnd - 0.1));
+      else                   selEnd   = Math.min(trimDuration, Math.max(t, selStart + 0.1));
+      renderTimeline();
+      writeInputs();
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+}
+tlStartHandle.addEventListener('pointerdown', makeDrag('start'));
+tlEndHandle.addEventListener('pointerdown', makeDrag('end'));
+
+// Click trên track (ngoài tay kéo) → tua media tới vị trí đó.
+tlTrack.addEventListener('click', e => {
+  if (e.target === tlStartHandle || e.target === tlEndHandle || !trimMediaEl || !trimDuration) return;
+  trimMediaEl.currentTime = timeFromClientX(e.clientX);
+  updatePlayhead();
+});
+
+// Nghe/xem thử đúng đoạn đã chọn.
+tlPreviewBtn.addEventListener('click', () => {
+  if (!trimMediaEl) return;
+  trimMediaEl.currentTime = selStart;
+  previewStopAt = selEnd;
+  trimMediaEl.play();
+});
+
+// Gõ tay vào ô input → cập nhật tay kéo.
+function syncFromInputs() {
+  if (!trimDuration) return;
+  const s = parseTimeJS(trimStart.value);
+  const e = trimEnd.value.trim() === '' ? trimDuration : parseTimeJS(trimEnd.value);
+  if (s !== null && s >= 0 && s < trimDuration) selStart = s;
+  if (e !== null && e > selStart && e <= trimDuration) selEnd = e;
+  renderTimeline();
+}
+trimStart.addEventListener('change', syncFromInputs);
+trimEnd.addEventListener('change', syncFromInputs);
+
+// "MM:SS" / "HH:MM:SS" gọn (label); fmtTimecode kèm 2 số lẻ (ô input, gửi backend).
+function fmtTime(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const pad = n => String(n).padStart(2, '0');
+  return (h > 0 ? h + ':' + pad(m) : m) + ':' + pad(s);
+}
+function fmtTimecode(sec) {
+  sec = Math.max(0, Math.round(sec * 100) / 100);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec - h * 3600 - m * 60;
+  const pad = n => String(n).padStart(2, '0');
+  const sStr = (s < 10 ? '0' : '') + s.toFixed(2);
+  return (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + sStr;
+}
+function parseTimeJS(str) {
+  str = (str || '').trim();
+  if (!str) return null;
+  const parts = str.split(':');
+  if (parts.length > 3) return null;
+  let total = 0;
+  for (const p of parts) {
+    if (p === '') return null;
+    const v = parseFloat(p);
+    if (isNaN(v) || v < 0) return null;
+    total = total * 60 + v;
+  }
+  return total;
 }
 
 document.getElementById('trimForm').addEventListener('submit', async e => {

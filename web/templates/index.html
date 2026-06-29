@@ -92,6 +92,24 @@
           <div id="trimFileName" class="file-name"></div>
         </div>
 
+        <!-- Player trực quan + timeline chọn đoạn -->
+        <div id="trimPlayerWrap" class="player-wrap hidden">
+          <div id="trimMediaHolder" class="media-holder"></div>
+          <div class="timeline" id="trimTimeline">
+            <div class="tl-track" id="tlTrack">
+              <div class="tl-range" id="tlRange"></div>
+              <div class="tl-playhead" id="tlPlayhead"></div>
+              <div class="tl-handle tl-handle-start" id="tlStart" title="Bắt đầu"></div>
+              <div class="tl-handle tl-handle-end" id="tlEnd" title="Kết thúc"></div>
+            </div>
+          </div>
+          <div class="tl-bar">
+            <span class="tl-time">Bắt đầu: <b id="tlStartLabel">00:00</b></span>
+            <button type="button" id="tlPreviewBtn" class="tl-preview">▶ Xem đoạn đã chọn</button>
+            <span class="tl-time">Kết thúc: <b id="tlEndLabel">00:00</b></span>
+          </div>
+        </div>
+
         <div class="time-row">
           <div class="form-group">
             <label class="form-label">Bắt đầu</label>

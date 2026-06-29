@@ -189,6 +189,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Job type tách `video_trim` / `audio_trim` để preview đúng kiểu (`mediaKind('audio_trim')`=audio); badge **Cắt** / **Cắt audio**
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.1
 
+### 22. v1.5.2 — Chọn thời gian bằng player trực quan
+- Chọn file xong → hiện `<video>`/`<audio>` (objectURL, client-side) + **timeline 2 tay kéo** Bắt đầu/Kết thúc; kéo để đặt đoạn, vùng chọn tô màu, có **playhead** chạy theo media
+- Nút **▶ Xem đoạn đã chọn**: tua tới start, play, tự dừng ở end (`previewStopAt` trong `timeupdate`); click trên track = tua media
+- Đồng bộ **2 chiều** với 2 ô nhập tay (vẫn chỉnh chính xác được): tay kéo → `writeInputs` ghi `fmtTimecode` (2 số lẻ); gõ tay → `syncFromInputs` (`parseTimeJS`); end ở cuối = ô trống = cắt tới hết
+- Chỉ sửa frontend (`index.html`, `app.js`, `style.css`); backend `/api/trim/media` giữ nguyên (vẫn đọc 2 ô start/end)
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.2
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -219,9 +226,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.5.1
+- Ổn định v1.5.2
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.2
 
 ---
 
@@ -242,7 +249,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## TODO tiếp theo
 
-- [x] Thêm tính năng cắt video/audio (trim theo thời gian) — v1.5.0 (video) + v1.5.1 (audio); còn lại: chọn thời gian bằng player trực quan
+- [x] Thêm tính năng cắt video/audio (trim theo thời gian) — v1.5.0 (video) + v1.5.1 (audio) + v1.5.2 (player trực quan)
 - [ ] Thêm tính năng chuyển đổi định dạng khác (MP4→WAV, MP4→AAC, ...)
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
@@ -270,3 +277,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.4.0 | Xem ảnh/video/audio trực tiếp trong web (nút 👁 Xem + modal, `/api/preview/:id`) |
 | v1.5.0 | Cắt video theo thời gian (tab Cắt video, `/api/trim/video`, FFmpeg `-ss`/`-t`) |
 | v1.5.1 | Cắt cả audio (mp3/wav/m4a/aac/flac/ogg), route đổi `/api/trim/media`, giữ định dạng nguồn |
+| v1.5.2 | Chọn thời gian cắt bằng player trực quan (timeline 2 tay kéo, playhead, xem thử đoạn) |
