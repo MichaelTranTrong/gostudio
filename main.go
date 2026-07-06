@@ -47,6 +47,7 @@ func main() {
 		api.GET("/jobs", handlers.JobList)
 		api.GET("/jobs/:id", handlers.JobStatus)
 		api.DELETE("/jobs/:id", handlers.DeleteJob)
+		api.PATCH("/jobs/:id/rename", handlers.RenameJob)
 		api.DELETE("/jobs", handlers.DeleteAllJobs)
 		api.GET("/download/:id", handlers.DownloadOutput)
 		api.GET("/preview/:id", handlers.PreviewOutput)

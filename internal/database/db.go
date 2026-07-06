@@ -44,6 +44,21 @@ func Migrate() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 	`)
+	if err != nil {
+		return err
+	}
+
+	var exists int
+	err = DB.QueryRow(`
+		SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'jobs' AND column_name = 'display_name'
+	`).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		_, err = DB.Exec(`ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255) DEFAULT NULL`)
+	}
 	return err
 }
 

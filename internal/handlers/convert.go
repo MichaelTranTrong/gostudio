@@ -107,6 +107,33 @@ func DeleteJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Đã xóa"})
 }
 
+// RenameJob đổi tên hiển thị của một job (không đổi tên file thật trên disk).
+func RenameJob(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Thiếu tên mới"})
+		return
+	}
+	name := strings.TrimSpace(body.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Tên không được để trống"})
+		return
+	}
+	name = filepath.Base(name) // chặn path traversal, chỉ giữ tên file
+	if err := models.RenameJob(id, name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Đã đổi tên", "display_name": name})
+}
+
 // DeleteAllJobs xóa toàn bộ lịch sử và reset AUTO_INCREMENT.
 func DeleteAllJobs(c *gin.Context) {
 	if err := models.DeleteAllJobs(); err != nil {
@@ -154,6 +181,14 @@ func serveOutput(c *gin.Context, disposition string) {
 		return
 	}
 	fileName := filepath.Base(job.OutputFile)
+	if job.DisplayName != "" {
+		ext := filepath.Ext(fileName)
+		if strings.HasSuffix(strings.ToLower(job.DisplayName), strings.ToLower(ext)) {
+			fileName = job.DisplayName
+		} else {
+			fileName = job.DisplayName + ext
+		}
+	}
 	encoded := url.PathEscape(fileName)
 	c.Header("Content-Disposition", disposition+`; filename="`+fileName+`"; filename*=UTF-8''`+encoded)
 	c.Header("Content-Type", contentTypeFor(fileName))

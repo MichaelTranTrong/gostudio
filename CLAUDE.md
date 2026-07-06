@@ -204,6 +204,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Frontend**: state `trimSourceId`; chọn file mới thì bỏ nguồn-từ-lịch-sử; `loadTrimPlayerSrc(url, isVideo)` tách dùng chung; submit gửi `source_id` hoặc `file`
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.3
 
+### 24. v1.5.4 — Đổi tên file trong lịch sử
+- Mỗi dòng lịch sử có nút **✏ Đổi tên** cạnh nút xóa → `prompt()` nhập tên mới, gọi `PATCH /api/jobs/:id/rename`
+- **Backend**: thêm cột `display_name` (migration kiểm tra `information_schema.columns` trước khi `ALTER TABLE` — MySQL 8.4 **không hỗ trợ** `ADD COLUMN IF NOT EXISTS`, xem mục Lỗi đã gặp); `models.RenameJob`; `serveOutput` dùng `display_name` (giữ nguyên đuôi file thật) cho `Content-Disposition` khi tải về/xem
+- Chỉ đổi **tên hiển thị + tên khi tải về**, không đổi tên file thật trên disk (`input_file`/`output_file` giữ nguyên) → xóa job vẫn dọn đúng file
+- **Frontend**: `jobMeta`/`loadHistory` ưu tiên `j.display_name` nếu đã đổi, không thì dùng tên suy ra như cũ
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.4
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -229,14 +236,15 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Quay video không ra file (lịch sử trống) | Cast `SCStreamFrameInfo` status thất bại → loại sạch mọi frame → file rỗng → không upload | Bắt đầu writer session ngay frame đầu; chỉ bỏ frame khi đọc được status và ≠ `.complete` |
 | Lần bấm quay thứ 2 vô tình dừng bản quay 1 | App single-shot nhưng instance cũ còn chạy, URL mới route về nó; nút Bắt đầu rơi vào state `.recording` | Bỏ qua URL mới khi đang quay/lưu; đóng panel = thoát app; nút ⏹ menu bar luôn dừng được |
 | Phím tắt toàn cục (Carbon `RegisterEventHotKey`) không kích hoạt | Đăng ký `status=0` nhưng sự kiện không tới app helper kiểu này (xác nhận qua log: handler không chạy) | Bỏ phím tắt; dùng nút ⏹ trên thanh menu (đúng cách macOS dừng quay) |
+| Migrate lỗi `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — `Error 1064 syntax` | `IF NOT EXISTS` cho `ADD COLUMN` là cú pháp MariaDB, **MySQL 8.4 không hỗ trợ** dù tài liệu dễ gây nhầm | Kiểm tra cột đã tồn tại qua `information_schema.columns` trước, chỉ `ALTER TABLE` nếu chưa có |
 
 ---
 
 ## Đang làm
 
-- Ổn định v1.5.3
+- Ổn định v1.5.4
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.3
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.4
 
 ---
 
@@ -287,3 +295,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.5.1 | Cắt cả audio (mp3/wav/m4a/aac/flac/ogg), route đổi `/api/trim/media`, giữ định dạng nguồn |
 | v1.5.2 | Chọn thời gian cắt bằng player trực quan (timeline 2 tay kéo, playhead, xem thử đoạn) |
 | v1.5.3 | Cắt cả file có sẵn trong app (nút ✂ Cắt ở lịch sử, `source_id`, chống trùng tên output) |
+| v1.5.4 | Đổi tên file trong lịch sử (nút ✏, cột `display_name`, áp dụng cho tên tải về) |

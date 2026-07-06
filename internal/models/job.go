@@ -7,14 +7,15 @@ import (
 )
 
 type Job struct {
-	ID         uint64    `json:"id"`
-	Type       string    `json:"type"`
-	Status     string    `json:"status"`
-	InputFile  string    `json:"input_file"`
-	OutputFile string    `json:"output_file"`
-	ErrorMsg   string    `json:"error_msg,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID          uint64    `json:"id"`
+	Type        string    `json:"type"`
+	Status      string    `json:"status"`
+	InputFile   string    `json:"input_file"`
+	OutputFile  string    `json:"output_file"`
+	DisplayName string    `json:"display_name,omitempty"`
+	ErrorMsg    string    `json:"error_msg,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func CreateJob(jobType, inputFile string) (uint64, error) {
@@ -39,10 +40,16 @@ func UpdateJob(id uint64, status, outputFile, errMsg string) error {
 
 func GetJob(id uint64) (*Job, error) {
 	row := database.DB.QueryRow(
-		`SELECT id, type, status, input_file, COALESCE(output_file,''), COALESCE(error_msg,''), created_at, updated_at FROM jobs WHERE id=?`, id,
+		`SELECT id, type, status, input_file, COALESCE(output_file,''), COALESCE(display_name,''), COALESCE(error_msg,''), created_at, updated_at FROM jobs WHERE id=?`, id,
 	)
 	j := &Job{}
-	return j, row.Scan(&j.ID, &j.Type, &j.Status, &j.InputFile, &j.OutputFile, &j.ErrorMsg, &j.CreatedAt, &j.UpdatedAt)
+	return j, row.Scan(&j.ID, &j.Type, &j.Status, &j.InputFile, &j.OutputFile, &j.DisplayName, &j.ErrorMsg, &j.CreatedAt, &j.UpdatedAt)
+}
+
+// RenameJob đặt tên hiển thị tùy chỉnh cho job (không đổi tên file thật trên disk).
+func RenameJob(id uint64, name string) error {
+	_, err := database.DB.Exec(`UPDATE jobs SET display_name=? WHERE id=?`, name, id)
+	return err
 }
 
 func DeleteJob(id uint64) error {
@@ -100,7 +107,7 @@ func DeleteAllJobs() error {
 
 func ListJobs() ([]Job, error) {
 	rows, err := database.DB.Query(
-		`SELECT id, type, status, input_file, COALESCE(output_file,''), COALESCE(error_msg,''), created_at, updated_at FROM jobs ORDER BY id DESC LIMIT 100`,
+		`SELECT id, type, status, input_file, COALESCE(output_file,''), COALESCE(display_name,''), COALESCE(error_msg,''), created_at, updated_at FROM jobs ORDER BY id DESC LIMIT 100`,
 	)
 	if err != nil {
 		return nil, err
@@ -109,7 +116,7 @@ func ListJobs() ([]Job, error) {
 	var jobs []Job
 	for rows.Next() {
 		var j Job
-		if err := rows.Scan(&j.ID, &j.Type, &j.Status, &j.InputFile, &j.OutputFile, &j.ErrorMsg, &j.CreatedAt, &j.UpdatedAt); err != nil {
+		if err := rows.Scan(&j.ID, &j.Type, &j.Status, &j.InputFile, &j.OutputFile, &j.DisplayName, &j.ErrorMsg, &j.CreatedAt, &j.UpdatedAt); err != nil {
 			return nil, err
 		}
 		jobs = append(jobs, j)

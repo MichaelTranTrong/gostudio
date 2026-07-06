@@ -482,7 +482,7 @@ async function loadHistory() {
     (jobs || []).forEach(j => {
       const tr = document.createElement('tr');
       const meta = jobMeta(j);
-      const displayName = meta.name;
+      const displayName = j.display_name || meta.name;
       const typeLabel = meta.badge;
       const date = new Date(j.created_at).toLocaleString('vi-VN');
       const kind = mediaKind(j.type);
@@ -503,7 +503,10 @@ async function loadHistory() {
         <td><span class="badge badge-${j.status}">${labelStatus(j.status)}</span></td>
         <td>${date}</td>
         <td>${dl}</td>
-        <td><button class="btn-delete-row" title="Xóa" data-id="${j.id}">✕</button></td>
+        <td>
+          <button class="btn-rename-row" title="Đổi tên" data-rename="${j.id}" data-name="${displayName}">✏</button>
+          <button class="btn-delete-row" title="Xóa" data-id="${j.id}">✕</button>
+        </td>
       `;
       jobBody.appendChild(tr);
     });
@@ -521,6 +524,20 @@ jobBody.addEventListener('click', async e => {
   if (trim) {
     e.preventDefault();
     loadTrimFromJob(trim.dataset.trim, trim.dataset.kind, trim.dataset.name);
+    return;
+  }
+  const rename = e.target.closest('[data-rename]');
+  if (rename) {
+    e.preventDefault();
+    const newName = prompt('Nhập tên mới:', rename.dataset.name);
+    if (newName === null || newName.trim() === '') return;
+    const res = await fetch('/api/jobs/' + rename.dataset.rename + '/rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); alert('❌ ' + (d.error || 'Đổi tên thất bại')); return; }
+    loadHistory();
     return;
   }
   const btn = e.target.closest('.btn-delete-row');
