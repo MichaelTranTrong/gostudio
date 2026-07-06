@@ -211,6 +211,15 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Frontend**: `jobMeta`/`loadHistory` ưu tiên `j.display_name` nếu đã đổi, không thì dùng tên suy ra như cũ
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.4
 
+### 25. v1.6.0 — Ghép nối video/audio
+- Tab mới **"Ghép nối"**: thêm nhiều video (hoặc nhiều audio) theo thứ tự → ghép thành 1 file; nguồn là **upload mới** và/hoặc **file có sẵn trong lịch sử** (nút **+ Ghép** trên mỗi dòng, giống ✂ Cắt)
+- **Backend** (`internal/handlers/concat.go`): route `POST /api/concat/media`, nhận field `order` (JSON `[{type:"upload"}|{type:"source",id}]`) + files upload theo thứ tự; job type `video_concat`/`audio_concat`
+- Video khác độ phân giải/fps: chuẩn hóa theo **file đầu tiên** (ffprobe đọc kích thước → `scale`+`pad`+`setsar`+`fps` từng input qua `filter_complex`) rồi `concat` → MP4 (H.264/AAC); audio: `aformat` 44.1kHz stereo rồi `concat`, giữ định dạng nguồn (tái dùng `trimEncodeArgs`)
+- Chặn ghép lẫn video+audio; **validate toàn bộ trước khi lưu** file upload xuống disk (2 bước: resolve/kiểm tra hết → mới save) tránh rác file khi request bị từ chối giữa chừng
+- `input_file` = nhãn `[Ghép] N file` → xóa job không đụng file nguồn; file upload tạm tự xóa sau khi ghép (defer trong `runConcat`)
+- **Frontend**: danh sách có thứ tự (▲▼ đổi chỗ, ✕ bỏ), state `concatItems` (`upload`|`source`); badge **Ghép** / **Ghép audio** (`badge-concat`)
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.0
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -242,9 +251,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.5.4
+- Ổn định v1.6.0
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.5.4
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.0
 
 ---
 
@@ -296,3 +305,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.5.2 | Chọn thời gian cắt bằng player trực quan (timeline 2 tay kéo, playhead, xem thử đoạn) |
 | v1.5.3 | Cắt cả file có sẵn trong app (nút ✂ Cắt ở lịch sử, `source_id`, chống trùng tên output) |
 | v1.5.4 | Đổi tên file trong lịch sử (nút ✏, cột `display_name`, áp dụng cho tên tải về) |
+| v1.6.0 | Ghép nối video/audio (tab Ghép nối, nút + Ghép ở lịch sử, `/api/concat/media`, chuẩn hóa độ phân giải) |

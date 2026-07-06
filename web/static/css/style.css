@@ -150,6 +150,7 @@ tr:last-child td { border-bottom: none; }
 .badge-photo      { background: rgba(76,175,144,0.12); color: var(--success); }
 .badge-screen     { background: rgba(255,200,0,0.12);  color: #ffc800; }
 .badge-trim       { background: rgba(139,128,255,0.14); color: #8b80ff; }
+.badge-concat     { background: rgba(76,175,144,0.14);  color: var(--success); }
 
 /* Cắt video/audio: player trực quan + timeline */
 .player-wrap { margin-top: 20px; }
@@ -280,6 +281,34 @@ code {
   transition: color 0.2s, background 0.2s;
 }
 .btn-rename-row:hover { color: var(--accent); background: rgba(122,162,247,0.1); }
+.btn-rename-row:disabled { opacity: 0.3; cursor: default; }
+
+/* Danh sách ghép nối */
+.concat-list { list-style: none; margin: 16px 0; display: flex; flex-direction: column; gap: 8px; }
+.concat-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+.concat-idx {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.concat-name { flex: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.concat-actions { display: flex; gap: 2px; flex-shrink: 0; }
 
 /* TTS form */
 .form-group { margin-bottom: 18px; }

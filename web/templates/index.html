@@ -13,6 +13,7 @@
     <a href="#" class="active" data-tab="mp4">MP4 → MP3</a>
     <a href="#" data-tab="tts">Chữ → Tiếng</a>
     <a href="#" data-tab="trim">Cắt video/audio</a>
+    <a href="#" data-tab="concat">Ghép nối</a>
     <a href="#" data-tab="capture">Quay màn hình</a>
   </nav>
 </header>
@@ -133,6 +134,36 @@
       <div id="trimResult" class="result hidden">
         <p>✅ Cắt thành công!</p>
         <a id="trimDownloadLink" class="btn-download" href="#">Tải xuống</a>
+      </div>
+    </section>
+  </div>
+
+  <!-- Tab: Ghép nối -->
+  <div id="tab-concat" class="hidden">
+    <section class="card">
+      <h2>Ghép Nối Video / Audio</h2>
+      <p class="hint">Thêm nhiều video (hoặc nhiều audio) theo thứ tự mong muốn — file mới hoặc lấy từ lịch sử (nút <b>+ Ghép</b>) — rồi ghép thành 1 file.</p>
+
+      <form id="concatForm">
+        <div class="drop-zone" id="concatDropZone">
+          <span>Kéo thả video/audio vào đây hoặc <span class="browse">chọn file (chọn nhiều được)</span></span>
+          <input type="file" id="concatFileInput" accept="video/*,audio/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.mp3,.wav,.m4a,.aac,.flac,.ogg" multiple hidden/>
+        </div>
+
+        <ul id="concatList" class="concat-list"></ul>
+        <p class="hint">Cần ít nhất 2 file <b>cùng loại</b> (toàn video hoặc toàn audio) để ghép. Kéo thứ tự bằng nút ▲▼.</p>
+
+        <button type="submit" id="concatSubmitBtn" disabled>Ghép nối</button>
+      </form>
+
+      <div id="concatProgress" class="progress hidden">
+        <div class="progress-bar"><div class="progress-fill" id="concatProgressFill"></div></div>
+        <p id="concatStatusText">Đang xử lý…</p>
+      </div>
+
+      <div id="concatResult" class="result hidden">
+        <p>✅ Ghép thành công!</p>
+        <a id="concatDownloadLink" class="btn-download" href="#">Tải xuống</a>
       </div>
     </section>
   </div>

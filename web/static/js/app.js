@@ -5,7 +5,7 @@ document.querySelectorAll('nav a[data-tab]').forEach(link => {
     const tab = link.dataset.tab;
     document.querySelectorAll('nav a[data-tab]').forEach(a => a.classList.remove('active'));
     link.classList.add('active');
-    ['mp4', 'tts', 'trim', 'capture'].forEach(t => {
+    ['mp4', 'tts', 'trim', 'concat', 'capture'].forEach(t => {
       document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
     });
     if (tab === 'tts') loadVoices();
@@ -391,6 +391,125 @@ document.getElementById('trimForm').addEventListener('submit', async e => {
   pollJob(jobId, trimProgressFill, trimStatusText, trimProgressEl, trimResultEl, trimDownloadLink, trimSubmitBtn);
 });
 
+// ── Ghép nối video/audio ───────────────────────────────────────
+const concatDropZone     = document.getElementById('concatDropZone');
+const concatFileInput    = document.getElementById('concatFileInput');
+const concatListEl       = document.getElementById('concatList');
+const concatSubmitBtn    = document.getElementById('concatSubmitBtn');
+const concatProgressEl   = document.getElementById('concatProgress');
+const concatProgressFill = document.getElementById('concatProgressFill');
+const concatStatusText   = document.getElementById('concatStatusText');
+const concatResultEl     = document.getElementById('concatResult');
+const concatDownloadLink = document.getElementById('concatDownloadLink');
+
+let concatItems = []; // { type: 'upload'|'source', file?, id?, name, kind }
+
+concatDropZone.addEventListener('click', () => concatFileInput.click());
+concatDropZone.addEventListener('dragover', e => { e.preventDefault(); concatDropZone.classList.add('drag-over'); });
+concatDropZone.addEventListener('dragleave', () => concatDropZone.classList.remove('drag-over'));
+concatDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  concatDropZone.classList.remove('drag-over');
+  addConcatFiles(e.dataTransfer.files);
+});
+concatFileInput.addEventListener('change', () => { addConcatFiles(concatFileInput.files); concatFileInput.value = ''; });
+
+// Suy loại (video/audio) từ đuôi file, dùng để chặn ghép lẫn 2 loại.
+function fileKind(name) {
+  const ext = '.' + name.split('.').pop().toLowerCase();
+  return ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'].includes(ext) ? 'video' : 'audio';
+}
+
+function addConcatFiles(fileList) {
+  for (const f of fileList) {
+    const kind = fileKind(f.name);
+    if (concatItems.length && concatItems[0].kind !== kind) {
+      alert('Không thể ghép lẫn video và audio trong cùng 1 lần.');
+      continue;
+    }
+    concatItems.push({ type: 'upload', file: f, name: f.name, kind });
+  }
+  renderConcatList();
+}
+
+// Thêm file có sẵn trong lịch sử vào danh sách ghép (nút "+ Ghép").
+function addConcatFromJob(id, kind, name) {
+  if (concatItems.length && concatItems[0].kind !== kind) {
+    alert('Không thể ghép lẫn video và audio trong cùng 1 lần.');
+    return;
+  }
+  concatItems.push({ type: 'source', id: Number(id), name, kind });
+  document.querySelector('nav a[data-tab="concat"]').click();
+  renderConcatList();
+}
+
+function renderConcatList() {
+  concatListEl.innerHTML = concatItems.map((it, i) => `
+    <li>
+      <span class="concat-idx">${i + 1}</span>
+      <span class="concat-name">${it.name}${it.type === 'source' ? ' (từ lịch sử)' : ''}</span>
+      <span class="concat-actions">
+        <button type="button" class="btn-rename-row" data-up="${i}" ${i === 0 ? 'disabled' : ''} title="Lên">▲</button>
+        <button type="button" class="btn-rename-row" data-down="${i}" ${i === concatItems.length - 1 ? 'disabled' : ''} title="Xuống">▼</button>
+        <button type="button" class="btn-delete-row" data-remove="${i}" title="Bỏ">✕</button>
+      </span>
+    </li>
+  `).join('');
+  concatSubmitBtn.disabled = concatItems.length < 2;
+}
+
+concatListEl.addEventListener('click', e => {
+  const up = e.target.closest('[data-up]');
+  const down = e.target.closest('[data-down]');
+  const rm = e.target.closest('[data-remove]');
+  if (up) {
+    const i = Number(up.dataset.up);
+    [concatItems[i - 1], concatItems[i]] = [concatItems[i], concatItems[i - 1]];
+  } else if (down) {
+    const i = Number(down.dataset.down);
+    [concatItems[i + 1], concatItems[i]] = [concatItems[i], concatItems[i + 1]];
+  } else if (rm) {
+    concatItems.splice(Number(rm.dataset.remove), 1);
+  } else {
+    return;
+  }
+  renderConcatList();
+});
+
+document.getElementById('concatForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (concatItems.length < 2) return;
+
+  concatSubmitBtn.disabled = true;
+  concatProgressEl.classList.remove('hidden');
+  concatResultEl.classList.add('hidden');
+  concatProgressFill.style.width = '20%';
+  concatStatusText.textContent = 'Đang tải lên…';
+
+  const order = concatItems.map(it => it.type === 'source' ? { type: 'source', id: it.id } : { type: 'upload' });
+  const fd = new FormData();
+  fd.append('order', JSON.stringify(order));
+  concatItems.forEach(it => { if (it.type === 'upload') fd.append('files', it.file); });
+
+  let jobId;
+  try {
+    const res = await fetch('/api/concat/media', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ghép thất bại');
+    jobId = data.job_id;
+    concatProgressFill.style.width = '40%';
+    concatStatusText.textContent = 'Đang ghép… (job #' + jobId + ')';
+  } catch (err) {
+    concatStatusText.textContent = '❌ ' + err.message;
+    concatSubmitBtn.disabled = false;
+    return;
+  }
+
+  concatItems = [];
+  renderConcatList();
+  pollJob(jobId, concatProgressFill, concatStatusText, concatProgressEl, concatResultEl, concatDownloadLink, concatSubmitBtn);
+});
+
 // ── Chụp ảnh / Quay video (macOS native app) ──────────────────
 function launchCapture(mode, paramObj, hintEl) {
   // Số job hiện tại để phát hiện job mới xuất hiện sau khi capture.
@@ -489,10 +608,14 @@ async function loadHistory() {
       const trimLink = kind !== 'image'
         ? `<a class="dl-link" href="#" data-trim="${j.id}" data-kind="${kind}" data-name="${displayName}">✂ Cắt</a>`
         : '';
+      const concatLink = kind !== 'image'
+        ? `<a class="dl-link" href="#" data-concat="${j.id}" data-kind="${kind}" data-name="${displayName}">+ Ghép</a>`
+        : '';
       const dl = j.status === 'done'
         ? `<div class="row-actions">
              <a class="dl-link" href="#" data-view="${j.id}" data-kind="${kind}" data-name="${displayName}">👁 Xem</a>
              ${trimLink}
+             ${concatLink}
              <a class="dl-link" href="/api/download/${j.id}">⬇ Tải về</a>
            </div>`
         : '—';
@@ -524,6 +647,12 @@ jobBody.addEventListener('click', async e => {
   if (trim) {
     e.preventDefault();
     loadTrimFromJob(trim.dataset.trim, trim.dataset.kind, trim.dataset.name);
+    return;
+  }
+  const concat = e.target.closest('[data-concat]');
+  if (concat) {
+    e.preventDefault();
+    addConcatFromJob(concat.dataset.concat, concat.dataset.kind, concat.dataset.name);
     return;
   }
   const rename = e.target.closest('[data-rename]');
@@ -558,6 +687,8 @@ function mediaKind(type) {
     case 'screen_record': return 'video';
     case 'video_trim':    return 'video';
     case 'audio_trim':    return 'audio';
+    case 'video_concat':  return 'video';
+    case 'audio_concat':  return 'audio';
     default:              return 'audio'; // mp4_to_mp3, text_to_speech
   }
 }
@@ -607,6 +738,10 @@ function jobMeta(j) {
       return { name: trimName(j.input_file), badge: '<span class="badge badge-trim">Cắt</span>' };
     case 'audio_trim':
       return { name: trimName(j.input_file), badge: '<span class="badge badge-trim">Cắt audio</span>' };
+    case 'video_concat':
+      return { name: j.input_file.replace('[Ghép] ', ''), badge: '<span class="badge badge-concat">Ghép</span>' };
+    case 'audio_concat':
+      return { name: j.input_file.replace('[Ghép] ', ''), badge: '<span class="badge badge-concat">Ghép audio</span>' };
     default:
       return { name: j.input_file.split('/').pop().replace(/^\d+_/, ''), badge: '<span class="badge badge-mp4">MP4</span>' };
   }

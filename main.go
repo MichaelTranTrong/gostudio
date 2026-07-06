@@ -41,6 +41,7 @@ func main() {
 	{
 		api.POST("/convert/mp4-to-mp3", handlers.ConvertMP4ToMP3)
 		api.POST("/trim/media", handlers.TrimMedia)
+		api.POST("/concat/media", handlers.ConcatMedia)
 		api.POST("/capture/upload", handlers.CaptureUpload)
 		api.POST("/tts", handlers.TextToSpeech)
 		api.GET("/voices", handlers.GetVoices)
