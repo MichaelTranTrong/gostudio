@@ -7,6 +7,11 @@
    Heuristic gốc chỉ bật cho repo v1 'pnnbao-ump/VieNeu-TTS', khiến
    các bản fine-tune 0.3B (vd ngoc-huyen) đọc cả câu reference
    ("...tính chiến đấu, tính định hướng") và lặp lại.
+
+3. web_stream.py: gộp thêm preset voices từ repo model gốc
+   (pnnbao-ump/VieNeu-TTS-0.3B-q4-gguf — 6 giọng nam/nữ Bắc/Nam)
+   vào model đang chạy. Bản fine-tune ngoc-huyen chỉ có 1 giọng
+   trong voices.json; voice codes dùng chung codec nên nạp lẫn được.
 """
 
 # ── Patch 1: web_stream.py ────────────────────────────────────
@@ -68,3 +73,29 @@ if old2 in c2:
     print('Patched standard.py: use_chat_format heuristic')
 else:
     print('WARN: standard.py pattern not found')
+
+# ── Patch 3: web_stream.py — gộp thêm giọng từ repo gốc ───────
+c1 = open(p1).read()
+
+old3 = '''        tts = new_tts
+        current_model_id = model_key
+        print(f"✅ Model Loaded Successfully: {repo_id}")'''
+
+new3 = '''        tts = new_tts
+        current_model_id = model_key
+        print(f"✅ Model Loaded Successfully: {repo_id}")
+        extra_repo = "pnnbao-ump/VieNeu-TTS-0.3B-q4-gguf"
+        if repo_id != extra_repo:
+            try:
+                keep_default = tts._default_voice
+                tts._load_voices_from_repo(extra_repo)
+                tts._default_voice = keep_default
+                print(f"📢 Merged extra preset voices from {extra_repo}")
+            except Exception as ve:
+                print(f"⚠️ Could not merge extra voices: {ve}")'''
+
+if old3 in c1:
+    open(p1, 'w').write(c1.replace(old3, new3))
+    print('Patched web_stream.py: merge extra preset voices')
+else:
+    print('WARN: web_stream.py merge-voices pattern not found')

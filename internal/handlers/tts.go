@@ -48,6 +48,17 @@ func TextToSpeech(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"job_id": jobID, "message": "Đang xử lý TTS"})
 }
 
+// Nhãn hiển thị kèm gợi ý thể loại; giọng không có trong map giữ nguyên tên từ VieNeu.
+var voiceLabels = map[string]string{
+	"NgocHuyen": "Ngọc Huyền (nữ — tự nhiên nhất: đọc truyện, nội dung dài)",
+	"Ly":        "Ly (nữ Bắc — tin tức, sách nói, e-learning)",
+	"Ngoc":      "Ngọc (nữ Bắc — tin tức, sách nói, e-learning)",
+	"Doan":      "Đoan (nữ Nam — quảng cáo, vlog, đời thường)",
+	"Binh":      "Bình (nam Bắc — thuyết minh, tài liệu, tin tức)",
+	"Tuyen":     "Tuyên (nam Bắc — thuyết minh, tài liệu, tin tức)",
+	"Vinh":      "Vĩnh (nam Nam — review, giải trí, thân mật)",
+}
+
 func GetVoices(c *gin.Context) {
 	resp, err := http.Get(vieneuURL() + "/voices")
 	if err != nil {
@@ -56,6 +67,20 @@ func GetVoices(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+
+	var voices []map[string]any
+	if json.Unmarshal(body, &voices) == nil {
+		for _, v := range voices {
+			if id, ok := v["id"].(string); ok {
+				if label, ok := voiceLabels[id]; ok {
+					v["name"] = label
+				}
+			}
+		}
+		if out, err := json.Marshal(voices); err == nil {
+			body = out
+		}
+	}
 	c.Data(resp.StatusCode, "application/json", body)
 }
 

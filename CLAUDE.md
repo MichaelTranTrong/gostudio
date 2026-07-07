@@ -220,6 +220,14 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Frontend**: danh sách có thứ tự (▲▼ đổi chỗ, ✕ bỏ), state `concatItems` (`upload`|`source`); badge **Ghép** / **Ghép audio** (`badge-concat`)
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.0
 
+### 26. v1.6.1 — TTS: bổ sung 6 giọng đọc
+- Tab Chữ → Tiếng giờ có **7 giọng**: Ngọc Huyền (mặc định) + 6 giọng từ repo model gốc `pnnbao-ump/VieNeu-TTS-0.3B-q4-gguf`: Vĩnh (nam Nam), Bình (nam Bắc), Tuyên (nam Bắc), Đoan (nữ Nam), Ly (nữ Bắc), Ngọc (nữ Bắc)
+- Cơ chế: giọng là "preset voices" (voice codes + ref text) nạp từ `voices.json` trong repo model HF; bản fine-tune ngoc-huyen chỉ khai báo 1 giọng, voice codes dùng chung codec (neucodec) nên nạp lẫn được vào model đang chạy
+- Chỉ sửa `vieneu/fix_stream.py` (patch 3): sau khi load model, gọi `tts._load_voices_from_repo(repo gốc)` để merge presets, giữ nguyên `_default_voice` = NgocHuyen; frontend không đổi (`/voices` tự trả danh sách mới)
+- Tên giọng trong dropdown kèm **gợi ý thể loại** (vd "Ly (nữ Bắc — tin tức, sách nói, e-learning)"): map `voiceLabels` trong `internal/handlers/tts.go` (`GetVoices` ghi đè `name` theo `id`, giọng lạ giữ tên gốc) — nhãn là việc của app, không patch vào VieNeu
+- Lưu ý phát hiện khi làm: **patch 1 của fix_stream.py (infer_stream→infer) không còn áp dụng được** — upstream đổi whitespace nên pattern không khớp (build in WARN), app hiện chạy `infer_stream`; TTS vẫn hoạt động bình thường
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -251,9 +259,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- Ổn định v1.6.0
+- Ổn định v1.6.1
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
 
 ---
 
@@ -306,3 +314,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.5.3 | Cắt cả file có sẵn trong app (nút ✂ Cắt ở lịch sử, `source_id`, chống trùng tên output) |
 | v1.5.4 | Đổi tên file trong lịch sử (nút ✏, cột `display_name`, áp dụng cho tên tải về) |
 | v1.6.0 | Ghép nối video/audio (tab Ghép nối, nút + Ghép ở lịch sử, `/api/concat/media`, chuẩn hóa độ phân giải) |
+| v1.6.1 | TTS: bổ sung 6 giọng đọc từ repo model gốc (7 giọng: 3 nam + 4 nữ, Bắc/Nam) + gợi ý thể loại trong dropdown |
