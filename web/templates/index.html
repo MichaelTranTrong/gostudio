@@ -76,7 +76,7 @@
     <a href="#" data-tab="tts">Chữ → Tiếng</a>
     <a href="#" data-tab="trim">Cắt video/audio</a>
     <a href="#" data-tab="concat">Ghép nối</a>
-    <a href="#" data-tab="capture">Quay màn hình</a>
+    {{ if not .authEnabled }}<a href="#" data-tab="capture">Quay màn hình</a>{{ end }}
   </nav>
   <div id="userBox" class="user-box hidden">
     <span id="userEmail" class="user-email"></span>
@@ -241,7 +241,8 @@
     </section>
   </div>
 
-  <!-- Tab: Quay màn hình (chứa 2 tab con: Chụp ảnh / Quay video) -->
+  {{ if not .authEnabled }}
+  <!-- Tab: Quay màn hình (chứa 2 tab con: Chụp ảnh / Quay video) — chỉ bản local -->
   <div id="tab-capture" class="hidden">
     <section class="card">
       <h2>Chụp & Quay màn hình (macOS)</h2>
@@ -311,6 +312,7 @@
       </div>
     </section>
   </div>
+  {{ end }}
 
   <!-- Lịch sử (dùng chung) -->
   <section class="card history-card">

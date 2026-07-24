@@ -248,6 +248,12 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Tự đăng xuất khi token hết hạn:** wrapper `fetch` bắt response 401 từ `/api/*` (trừ `/api/auth/*`) → xóa token + hiện lại màn đăng nhập.
 - Đã test cục bộ 8 case (forgot/reset/token sai/mật khẩu ngắn/đổi xong login mật khẩu cũ 401 + mới 200/chống dò email/token dùng 1 lần).
 
+### 29. v1.7.2 — Ẩn quay/chụp màn hình khỏi bản online
+- Chức năng quay video / chụp ảnh chỉ chạy được ở **local trên macOS** (qua native app `gostudio://`), vô nghĩa trên VPS → **ẩn hẳn khỏi bản online** (`AUTH_ENABLED=true`).
+- **Frontend:** bọc nav link "Quay màn hình" + toàn bộ `#tab-capture` trong `{{ if not .authEnabled }}...{{ end }}` → bản online không có luôn trong HTML. Thêm `?.` cho chỗ chuyển tab và 2 nút `shotBtn`/`vidBtn` (tránh crash script khi DOM vắng mặt).
+- **Backend:** route `POST /api/capture/upload` chỉ đăng ký khi `!authEnabled` (local); bản online → 404.
+- Đã test 2 chế độ: online (không có markup capture, endpoint 404) / local (giữ nguyên, endpoint 400).
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -288,7 +294,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Chặn:** disk VPS đang 90% (chỉ ~3GB trống) + RAM căng (build llama-cpp nặng). Trước khi build cần dọn: `docker builder prune -f` + `docker image prune -af` (thu hồi ~8GB, không mất dữ liệu, không đụng container đang chạy).
   - Lệnh build khi làm: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build vieneu`
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.2
 
 ---
 
@@ -349,3 +355,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.6.1 | TTS: bổ sung 6 giọng đọc từ repo model gốc (7 giọng: 3 nam + 4 nữ, Bắc/Nam) + gợi ý thể loại trong dropdown |
 | v1.7.0 | Đăng ký/Đăng nhập dùng chung tài khoản Go Keep (feature flag `AUTH_ENABLED`, JWT, xác thực email, lịch sử job tách theo user) |
 | v1.7.1 | Quên mật khẩu / Đặt lại mật khẩu qua email + tự đăng xuất khi token hết hạn |
+| v1.7.2 | Ẩn quay/chụp màn hình khỏi bản online (chỉ dùng local trên macOS) |

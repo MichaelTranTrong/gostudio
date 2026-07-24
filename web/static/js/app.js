@@ -228,8 +228,9 @@ document.querySelectorAll('nav a[data-tab]').forEach(link => {
     const tab = link.dataset.tab;
     document.querySelectorAll('nav a[data-tab]').forEach(a => a.classList.remove('active'));
     link.classList.add('active');
+    // 'capture' chỉ có ở bản local (bản online bị ẩn qua template) → dùng ?. cho an toàn.
     ['mp4', 'tts', 'trim', 'concat', 'capture'].forEach(t => {
-      document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+      document.getElementById('tab-' + t)?.classList.toggle('hidden', t !== tab);
     });
     if (tab === 'tts') loadVoices();
   });
@@ -767,15 +768,15 @@ function launchCapture(mode, paramObj, hintEl) {
   });
 }
 
-// Tab Chụp ảnh: phạm vi + ẩn con trỏ.
-document.getElementById('shotBtn').addEventListener('click', () => {
+// Tab Chụp ảnh: phạm vi + ẩn con trỏ. (Chỉ có ở bản local; bản online ẩn tab → nút vắng mặt.)
+document.getElementById('shotBtn')?.addEventListener('click', () => {
   const p = { region: document.getElementById('shotRegion').value };
   if (document.getElementById('shotHideCursor').checked) p.cursor = 'hide';
   launchCapture('screenshot', p, document.getElementById('shotHint'));
 });
 
 // Tab Quay video: phạm vi + âm thanh (có đếm ngược trong app).
-document.getElementById('vidBtn').addEventListener('click', () => {
+document.getElementById('vidBtn')?.addEventListener('click', () => {
   const p = {
     region: document.getElementById('vidRegion').value,
     audio: document.getElementById('vidAudio').value,

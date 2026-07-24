@@ -50,11 +50,10 @@ func main() {
 
 	api := r.Group("/api")
 
-	// Endpoint capture của native app macOS dùng token riêng (không phải JWT user),
-	// nên luôn để ngoài lớp đăng nhập.
-	api.POST("/capture/upload", handlers.CaptureUpload)
-
 	if authEnabled {
+		// Bản online (VPS): KHÔNG có quay/chụp màn hình — chức năng đó chỉ chạy
+		// local qua native app macOS, nên không đăng ký /api/capture/upload.
+
 		// Route auth công khai (chưa đăng nhập vẫn gọi được).
 		ag := api.Group("/auth")
 		ag.POST("/register", handlers.Register)
@@ -68,6 +67,8 @@ func main() {
 		// Mọi route media yêu cầu đăng nhập.
 		registerMediaRoutes(api.Group("", auth.RequireAuth()))
 	} else {
+		// Bản local: có quay/chụp màn hình (native app macOS dùng token riêng).
+		api.POST("/capture/upload", handlers.CaptureUpload)
 		registerMediaRoutes(api)
 	}
 
