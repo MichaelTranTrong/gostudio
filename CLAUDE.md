@@ -287,12 +287,12 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** ✅ code xong + **đã deploy VPS** (`~/gostudio`, chạy `app`+`db` với `docker-compose.yml` + `docker-compose.vps.yml`) + **đã release**: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.0. Đã verify qua `https://gostudio.zalink.io.vn`: đăng nhập/đăng ký/xác thực email/cách ly job theo user đều chạy.
-  - VPS: dùng `docker-compose` (v2.24, có gạch nối), KHÔNG phải `docker compose`. Secret trong `~/gostudio/.env` (untracked, sống qua `git reset --hard`).
-  - NPM proxy host `gostudio.zalink.io.vn` → forward `http` cổng **2005** (giống cách gokeep dùng 1999). Cần thêm `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn — **kiểm tra lại xem đã thêm chưa**.
-- **⏳ TODO: build `vieneu` (TTS) trên VPS — TẠM HOÃN.** Tab "Chữ → Tiếng" chưa dùng được trên VPS vì service `vieneu` chưa dựng (app báo `bad address 'vieneu:8001'`). Mọi chức năng khác (convert/trim/concat) chạy bình thường (ffmpeg có sẵn trong image app).
-  - **Chặn:** disk VPS đang 90% (chỉ ~3GB trống) + RAM căng (build llama-cpp nặng). Trước khi build cần dọn: `docker builder prune -f` + `docker image prune -af` (thu hồi ~8GB, không mất dữ liệu, không đụng container đang chạy).
-  - Lệnh build khi làm: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build vieneu`
+- **📵 CHỦ TRƯƠNG HIỆN TẠI: chỉ phát triển LOCAL, KHÔNG deploy lên server nữa.** Các phiên bản sau vẫn làm/chạy trên máy local như cũ (auth tắt, `docker compose up -d`, port 2005). **Không upload lên VPS** cho tới khi có kinh phí nâng cấp server đủ mạnh. Bản online đã gỡ (xem dưới).
+- **🛑 Đã GỠ bản online khỏi VPS (2026-07-25).** VPS (`103.232.122.136`, SSH cổng 2223, user `ubuntu`, thư mục cũ `~/gostudio`) quá nhỏ/yếu, không đủ chạy đầy đủ tính năng (đặc biệt `vieneu`/TTS: disk 90%, RAM căng) → lần chạy online xem như thất bại, đã tháo dỡ để server nhẹ hơn (disk 90%→74%, thu hồi ~4.6GB).
+  - Đã làm khi gỡ: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml down -v` (xóa 2 container + 4 volume riêng gostudio: mysql_data/uploads/outputs/vieneu_cache + network) → `docker rmi gostudio-app` → `docker builder prune -f` + `docker image prune -f` → `rm -rf ~/gostudio`. Backup secret ra `~/gostudio.env.bak` (còn giữ). Đã xóa proxy host `gostudio.zalink.io.vn` trong Nginx Proxy Manager.
+  - **DNS: không đụng gì.** `zalink.io.vn` dùng **wildcard `*.zalink.io.vn`** (quản lý tại PA Vietnam — `ns1/ns2.pavietnam.vn`) → không có bản ghi `gostudio` riêng để xóa; xóa wildcard sẽ chết luôn `gokeep`. Sau khi bỏ proxy host, `gostudio.zalink.io.vn` không còn phục vụ app (NPM trả mặc định/404).
+  - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
+  - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
 - Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.2
 
@@ -314,6 +314,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Dùng chung tài khoản Go Keep qua **kết nối MySQL thứ 2** (không proxy API) | Go Studio + Go Keep cùng VPS → nối thẳng `gokeep.users` sạch hơn, không phụ thuộc Go Keep web online |
 | JWT **tự cài bằng stdlib** (HS256) | Tránh thêm dependency; JWT của Go Studio độc lập session với Go Keep |
 | Token lưu **cookie + localStorage** | Cookie cho thẻ media/download (không gắn header được), localStorage cho fetch API |
+| **Chỉ phát triển local, ngừng deploy VPS** (2026-07-25) | VPS hiện quá yếu, không kham nổi đầy đủ tính năng (nhất là TTS `vieneu`) → đã gỡ bản online, các version sau làm local như cũ; chờ nâng cấp server mới re-deploy (code auth/`docker-compose.vps.yml` vẫn giữ sẵn) |
 
 ---
 
