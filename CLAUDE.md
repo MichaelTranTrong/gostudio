@@ -274,8 +274,12 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** code xong + đã test toàn bộ luồng cục bộ (register/login/me/verify email/cookie-auth/cách ly job theo user). **Chưa deploy VPS, chưa release.**
-  - Trước khi deploy VPS: đảm bảo Go Keep đang chạy trên VPS (network `gokeep_default`), đặt `APP_URL`/`JWT_SECRET` trong `docker-compose.vps.yml`.
+- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** ✅ code xong + **đã deploy VPS** (`~/gostudio`, chạy `app`+`db` với `docker-compose.yml` + `docker-compose.vps.yml`). Đã verify qua `https://gostudio.zalink.io.vn`: đăng nhập/đăng ký/xác thực email/cách ly job theo user đều chạy. **Chưa tag/release.**
+  - VPS: dùng `docker-compose` (v2.24, có gạch nối), KHÔNG phải `docker compose`. Secret trong `~/gostudio/.env` (untracked, sống qua `git reset --hard`).
+  - NPM proxy host `gostudio.zalink.io.vn` → forward `http` cổng **2005** (giống cách gokeep dùng 1999). Cần thêm `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn — **kiểm tra lại xem đã thêm chưa**.
+- **⏳ TODO: build `vieneu` (TTS) trên VPS — TẠM HOÃN.** Tab "Chữ → Tiếng" chưa dùng được trên VPS vì service `vieneu` chưa dựng (app báo `bad address 'vieneu:8001'`). Mọi chức năng khác (convert/trim/concat) chạy bình thường (ffmpeg có sẵn trong image app).
+  - **Chặn:** disk VPS đang 90% (chỉ ~3GB trống) + RAM căng (build llama-cpp nặng). Trước khi build cần dọn: `docker builder prune -f` + `docker image prune -af` (thu hồi ~8GB, không mất dữ liệu, không đụng container đang chạy).
+  - Lệnh build khi làm: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build vieneu`
 - Repo public: https://github.com/MichaelTranTrong/gostudio
 - Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
 
@@ -307,6 +311,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
 - [x] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại) — `uniqueOutputPath` cho job cắt (v1.5.3); các job khác chưa áp dụng
+- [ ] **Build `vieneu` (TTS) trên VPS** — tạm hoãn (cần dọn disk VPS trước; xem mục "Đang làm")
 - [ ] Tự động xóa file upload/output sau N ngày
 - [x] Thêm xác thực người dùng (login) — v1.7.0 (dùng chung tài khoản Go Keep, feature flag `AUTH_ENABLED`)
 - [ ] Quay video macOS: thu micro, nhân scale Retina (cửa sổ + vùng đã xong ở v1.3.1/v1.3.2)
