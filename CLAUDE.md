@@ -274,14 +274,14 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## Đang làm
 
-- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** ✅ code xong + **đã deploy VPS** (`~/gostudio`, chạy `app`+`db` với `docker-compose.yml` + `docker-compose.vps.yml`). Đã verify qua `https://gostudio.zalink.io.vn`: đăng nhập/đăng ký/xác thực email/cách ly job theo user đều chạy. **Chưa tag/release.**
+- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** ✅ code xong + **đã deploy VPS** (`~/gostudio`, chạy `app`+`db` với `docker-compose.yml` + `docker-compose.vps.yml`) + **đã release**: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.0. Đã verify qua `https://gostudio.zalink.io.vn`: đăng nhập/đăng ký/xác thực email/cách ly job theo user đều chạy.
   - VPS: dùng `docker-compose` (v2.24, có gạch nối), KHÔNG phải `docker compose`. Secret trong `~/gostudio/.env` (untracked, sống qua `git reset --hard`).
   - NPM proxy host `gostudio.zalink.io.vn` → forward `http` cổng **2005** (giống cách gokeep dùng 1999). Cần thêm `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn — **kiểm tra lại xem đã thêm chưa**.
 - **⏳ TODO: build `vieneu` (TTS) trên VPS — TẠM HOÃN.** Tab "Chữ → Tiếng" chưa dùng được trên VPS vì service `vieneu` chưa dựng (app báo `bad address 'vieneu:8001'`). Mọi chức năng khác (convert/trim/concat) chạy bình thường (ffmpeg có sẵn trong image app).
   - **Chặn:** disk VPS đang 90% (chỉ ~3GB trống) + RAM căng (build llama-cpp nặng). Trước khi build cần dọn: `docker builder prune -f` + `docker image prune -af` (thu hồi ~8GB, không mất dữ liệu, không đụng container đang chạy).
   - Lệnh build khi làm: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build vieneu`
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.0
 
 ---
 
