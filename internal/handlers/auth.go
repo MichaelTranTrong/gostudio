@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -137,6 +138,66 @@ func VerifyEmail(c *gin.Context) {
 		return
 	}
 	c.Redirect(http.StatusSeeOther, "/?verified=success")
+}
+
+// ForgotPassword gửi email chứa link đặt lại mật khẩu. Luôn trả về success
+// để tránh lộ email nào đã đăng ký (chống dò email).
+func ForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dữ liệu không hợp lệ"})
+		return
+	}
+	msg := gin.H{"message": "Nếu email tồn tại, link đặt lại mật khẩu đã được gửi"}
+
+	user, _, err := auth.GetUserByEmail(req.Email)
+	if err != nil || user == nil {
+		c.JSON(http.StatusOK, msg)
+		return
+	}
+	token := randToken()
+	if err := auth.SetResetToken(user.ID, token, time.Now().Add(1*time.Hour)); err == nil {
+		resetLink := auth.AppURL() + "/?reset_token=" + token
+		go auth.SendResetEmail(user.Email, user.Name, resetLink)
+	}
+	c.JSON(http.StatusOK, msg)
+}
+
+// ResetPassword đặt mật khẩu mới dựa vào token trong email.
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dữ liệu không hợp lệ"})
+		return
+	}
+	if req.Token == "" || len(req.Password) < 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Mật khẩu phải có ít nhất 6 ký tự"})
+		return
+	}
+	userID, err := auth.GetUserIDByResetToken(req.Token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi máy chủ"})
+		return
+	}
+	if userID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token không hợp lệ hoặc đã hết hạn"})
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi máy chủ"})
+		return
+	}
+	if err := auth.UpdatePassword(userID, string(hash)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi máy chủ"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Đặt lại mật khẩu thành công"})
 }
 
 func ResendVerify(c *gin.Context) {

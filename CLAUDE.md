@@ -241,6 +241,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Deploy:** `docker-compose.yml` giữ nguyên cho local. Thêm **`docker-compose.vps.yml`** (override) set `AUTH_ENABLED`, `GOKEEP_DB_DSN`, `JWT_SECRET`, `NOTIFY_URL`, `APP_URL` + nối network `gokeep_default`. Chạy VPS: `docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build`.
 - **Lưu ý deploy:** đặt `APP_URL` đúng domain Go Studio (link xác thực email dựa vào nó); đổi `JWT_SECRET` thành chuỗi ngẫu nhiên dài.
 
+### 28. v1.7.1 — Quên mật khẩu / Đặt lại mật khẩu (hoàn thiện auth)
+- Bổ sung luồng còn thiếu so với Go Keep: **quên mật khẩu → nhận email → đặt mật khẩu mới**.
+- **Backend:** route `POST /api/auth/forgot-password` (gửi email chứa link, luôn trả success để chống dò email) + `POST /api/auth/reset-password` (đổi mật khẩu qua token, hết hạn 1 giờ). Dùng cột `reset_token`/`reset_token_expires` sẵn có của bảng `users` Go Keep; gửi email qua `notify.zalink.io.vn` (`SendResetEmail`). Link reset trỏ về `APP_URL/?reset_token=...`.
+- **Frontend:** thêm 2 panel trong overlay auth (Quên mật khẩu: nhập email; Đặt mật khẩu mới: mở từ link email qua `?reset_token=`), link "Quên mật khẩu?" ở trang đăng nhập. `boot()` phát hiện `?reset_token` → hiện panel đặt lại (không cần đăng nhập).
+- **Tự đăng xuất khi token hết hạn:** wrapper `fetch` bắt response 401 từ `/api/*` (trừ `/api/auth/*`) → xóa token + hiện lại màn đăng nhập.
+- Đã test cục bộ 8 case (forgot/reset/token sai/mật khẩu ngắn/đổi xong login mật khẩu cũ 401 + mới 200/chống dò email/token dùng 1 lần).
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -281,7 +288,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Chặn:** disk VPS đang 90% (chỉ ~3GB trống) + RAM căng (build llama-cpp nặng). Trước khi build cần dọn: `docker builder prune -f` + `docker image prune -af` (thu hồi ~8GB, không mất dữ liệu, không đụng container đang chạy).
   - Lệnh build khi làm: `docker-compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build vieneu`
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.0
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.1
 
 ---
 
@@ -341,3 +348,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.6.0 | Ghép nối video/audio (tab Ghép nối, nút + Ghép ở lịch sử, `/api/concat/media`, chuẩn hóa độ phân giải) |
 | v1.6.1 | TTS: bổ sung 6 giọng đọc từ repo model gốc (7 giọng: 3 nam + 4 nữ, Bắc/Nam) + gợi ý thể loại trong dropdown |
 | v1.7.0 | Đăng ký/Đăng nhập dùng chung tài khoản Go Keep (feature flag `AUTH_ENABLED`, JWT, xác thực email, lịch sử job tách theo user) |
+| v1.7.1 | Quên mật khẩu / Đặt lại mật khẩu qua email + tự đăng xuất khi token hết hạn |

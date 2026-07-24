@@ -59,6 +59,8 @@ func main() {
 		ag := api.Group("/auth")
 		ag.POST("/register", handlers.Register)
 		ag.POST("/login", handlers.Login)
+		ag.POST("/forgot-password", handlers.ForgotPassword)
+		ag.POST("/reset-password", handlers.ResetPassword)
 		ag.GET("/verify-email", handlers.VerifyEmail)
 		ag.GET("/me", auth.RequireAuth(), handlers.Me)
 		ag.POST("/resend-verify", auth.RequireAuth(), handlers.ResendVerify)

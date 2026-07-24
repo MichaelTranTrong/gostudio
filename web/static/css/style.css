@@ -495,3 +495,14 @@ select:focus { border-color: var(--accent); }
 .verify-banner a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .verify-banner a:hover { text-decoration: underline; }
 #resendMsg { margin-left: 8px; color: var(--success); }
+
+/* Thông báo thành công trong khung auth (vd đã gửi email đặt lại mật khẩu) */
+.auth-msg {
+  background: rgba(76,175,144,0.12);
+  border: 1px solid var(--success);
+  color: var(--success);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}

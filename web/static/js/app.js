@@ -22,10 +22,23 @@ function clearToken() {
   window.fetch = function (url, opts) {
     opts = opts || {};
     const t = getToken();
-    if (t && typeof url === 'string' && url.indexOf('/api') === 0) {
+    const isApi = typeof url === 'string' && url.indexOf('/api') === 0;
+    if (t && isApi) {
       opts.headers = Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t });
     }
-    return _fetch(url, opts);
+    const p = _fetch(url, opts);
+    // Token hết hạn giữa chừng → tự đăng xuất (bỏ qua chính các endpoint /api/auth/*).
+    if (window.AUTH_ENABLED === true && isApi && url.indexOf('/api/auth/') !== 0) {
+      return p.then(res => {
+        if (res.status === 401) {
+          clearToken(); currentUser = null;
+          if (typeof updateUserBox === 'function') updateUserBox();
+          if (typeof showAuthPanel === 'function') { showAuthPanel('login'); openAuth(); }
+        }
+        return res;
+      });
+    }
+    return p;
   };
 })();
 
@@ -34,9 +47,11 @@ function showAuthError(id, msg) {
   if (el) { el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
 }
 function showAuthPanel(which) {
-  document.getElementById('loginPanel').classList.toggle('hidden', which !== 'login');
-  document.getElementById('registerPanel').classList.toggle('hidden', which !== 'register');
-  showAuthError('loginError', ''); showAuthError('registerError', '');
+  ['login', 'register', 'forgot', 'reset'].forEach(p => {
+    const el = document.getElementById(p + 'Panel');
+    if (el) el.classList.toggle('hidden', p !== which);
+  });
+  ['loginError', 'registerError', 'forgotError', 'resetError'].forEach(id => showAuthError(id, ''));
 }
 function openAuth() {
   document.getElementById('authOverlay').classList.remove('hidden');
@@ -88,6 +103,42 @@ function logout() {
   updateUserBox(); showAuthPanel('login'); openAuth();
 }
 
+async function doForgot() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msg = document.getElementById('forgotMsg');
+  if (!email) { showAuthError('forgotError', 'Vui lòng nhập email.'); return; }
+  const btn = document.getElementById('forgotBtn'); btn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    showAuthError('forgotError', '');
+    msg.textContent = data.message || 'Nếu email tồn tại, link đặt lại đã được gửi.';
+    msg.classList.remove('hidden');
+  } catch (e) { showAuthError('forgotError', 'Lỗi kết nối máy chủ.'); }
+  finally { btn.disabled = false; }
+}
+
+async function doReset() {
+  const pw = document.getElementById('resetPassword').value;
+  if (pw.length < 6) { showAuthError('resetError', 'Mật khẩu phải có ít nhất 6 ký tự.'); return; }
+  const btn = document.getElementById('resetBtn'); btn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: window._resetToken, password: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) { showAuthError('resetError', data.error || 'Đặt lại thất bại.'); return; }
+    alert('✅ Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.');
+    window._resetToken = null;
+    showAuthPanel('login');
+  } catch (e) { showAuthError('resetError', 'Lỗi kết nối máy chủ.'); }
+  finally { btn.disabled = false; }
+}
+
 function updateUserBox() {
   const box = document.getElementById('userBox');
   if (!box) return;
@@ -118,15 +169,23 @@ function startApp() {
   setInterval(loadHistory, 8000);
 }
 
+let _authWired = false;
 function wireAuthUI() {
+  if (_authWired) return;
+  _authWired = true;
   document.getElementById('loginBtn')?.addEventListener('click', doLogin);
   document.getElementById('registerBtn')?.addEventListener('click', doRegister);
   document.getElementById('logoutBtn')?.addEventListener('click', logout);
+  document.getElementById('forgotBtn')?.addEventListener('click', doForgot);
+  document.getElementById('resetBtn')?.addEventListener('click', doReset);
   document.getElementById('toRegister')?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('register'); });
-  document.getElementById('toLogin')?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('login'); });
+  document.getElementById('toForgot')?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('forgot'); });
+  ['toLogin', 'toLogin2', 'toLogin3'].forEach(id =>
+    document.getElementById(id)?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('login'); }));
   document.getElementById('resendLink')?.addEventListener('click', e => { e.preventDefault(); resendVerify(); });
   document.getElementById('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+  document.getElementById('resetPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') doReset(); });
 }
 
 async function boot() {
@@ -140,6 +199,16 @@ async function boot() {
   if (!AUTH_ENABLED) { startApp(); return; } // bản local: chạy thẳng
 
   wireAuthUI();
+
+  // Link đặt lại mật khẩu từ email → hiện panel đặt mật khẩu mới (không cần đăng nhập).
+  const resetToken = params.get('reset_token');
+  if (resetToken) {
+    window._resetToken = resetToken;
+    history.replaceState(null, '', location.pathname);
+    showAuthPanel('reset'); openAuth();
+    return;
+  }
+
   const t = getToken();
   if (!t) { showAuthPanel('login'); openAuth(); return; }
   try {

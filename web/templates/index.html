@@ -24,6 +24,7 @@
       <label class="auth-label">Mật khẩu</label>
       <input class="auth-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"/>
       <button class="auth-btn" id="loginBtn">Đăng nhập</button>
+      <div class="auth-switch"><a href="#" id="toForgot">Quên mật khẩu?</a></div>
       <div class="auth-switch">Chưa có tài khoản? <a href="#" id="toRegister">Tạo tài khoản mới</a></div>
     </div>
 
@@ -40,6 +41,29 @@
       <input class="auth-input" type="password" id="registerPassword" placeholder="Ít nhất 6 ký tự" autocomplete="new-password"/>
       <button class="auth-btn" id="registerBtn">Tạo tài khoản</button>
       <div class="auth-switch">Đã có tài khoản? <a href="#" id="toLogin">Đăng nhập</a></div>
+    </div>
+
+    <!-- Quên mật khẩu: nhập email -->
+    <div id="forgotPanel" class="hidden">
+      <h2>Quên mật khẩu</h2>
+      <p class="auth-sub">Nhập email, hệ thống gửi link đặt lại mật khẩu.</p>
+      <div class="auth-error" id="forgotError"></div>
+      <div class="auth-msg hidden" id="forgotMsg"></div>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email"/>
+      <button class="auth-btn" id="forgotBtn">Gửi link đặt lại</button>
+      <div class="auth-switch"><a href="#" id="toLogin2">← Quay lại đăng nhập</a></div>
+    </div>
+
+    <!-- Đặt lại mật khẩu: nhập mật khẩu mới (mở từ link trong email) -->
+    <div id="resetPanel" class="hidden">
+      <h2>Đặt mật khẩu mới</h2>
+      <p class="auth-sub">Nhập mật khẩu mới cho tài khoản của bạn.</p>
+      <div class="auth-error" id="resetError"></div>
+      <label class="auth-label">Mật khẩu mới</label>
+      <input class="auth-input" type="password" id="resetPassword" placeholder="Ít nhất 6 ký tự" autocomplete="new-password"/>
+      <button class="auth-btn" id="resetBtn">Đặt lại mật khẩu</button>
+      <div class="auth-switch"><a href="#" id="toLogin3">← Quay lại đăng nhập</a></div>
     </div>
   </div>
 </div>

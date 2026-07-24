@@ -24,6 +24,36 @@ func AppURL() string {
 	return "http://localhost:2005"
 }
 
+// SendResetEmail gửi email đặt lại mật khẩu qua notify service.
+func SendResetEmail(toEmail, toName, resetLink string) error {
+	body := map[string]any{
+		"to":      toEmail,
+		"subject": "Đặt lại mật khẩu Go Studio",
+		"body": fmt.Sprintf(`Xin chào %s,
+
+Bạn vừa yêu cầu đặt lại mật khẩu Go Studio.
+
+Nhấp vào liên kết dưới đây để đặt mật khẩu mới (có hiệu lực trong 1 giờ):
+
+%s
+
+Nếu bạn không yêu cầu, hãy bỏ qua email này.
+
+Go Studio Team`, toName, resetLink),
+		"isHtml": false,
+	}
+	payload, _ := json.Marshal(body)
+	resp, err := http.Post(notifyURL()+"/api/email/send", "application/json", bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("notify API error: status %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // SendVerifyEmail gửi email xác thực qua notify service (giống Go Keep,
 // nhưng nội dung + link do Go Studio phát hành).
 func SendVerifyEmail(toEmail, toName, verifyLink string) error {

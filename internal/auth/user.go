@@ -3,6 +3,7 @@ package auth
 import (
 	"database/sql"
 	"strings"
+	"time"
 
 	"gostudio/internal/database"
 )
@@ -56,6 +57,34 @@ func CreateUser(email, name, passwordHash string) (uint64, error) {
 
 func SetVerifyToken(userID uint64, token string) error {
 	_, err := database.AuthDB.Exec(`UPDATE users SET verify_token = ? WHERE id = ?`, token, userID)
+	return err
+}
+
+// SetResetToken lưu token đặt lại mật khẩu + hạn dùng.
+func SetResetToken(userID uint64, token string, expires time.Time) error {
+	_, err := database.AuthDB.Exec(
+		`UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?`,
+		token, expires, userID)
+	return err
+}
+
+// GetUserIDByResetToken trả về id user nếu token còn hiệu lực (0 nếu không có/hết hạn).
+func GetUserIDByResetToken(token string) (uint64, error) {
+	var id uint64
+	err := database.AuthDB.QueryRow(
+		`SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > NOW()`, token,
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
+}
+
+// UpdatePassword đổi mật khẩu và xóa reset_token.
+func UpdatePassword(userID uint64, hash string) error {
+	_, err := database.AuthDB.Exec(
+		`UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`,
+		hash, userID)
 	return err
 }
 
