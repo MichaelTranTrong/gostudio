@@ -6,7 +6,7 @@ services:
       - "2005:2005"
     environment:
       DB_HOST: db
-      DB_PORT: 3306
+      DB_PORT: "3306"
       DB_USER: gostudio
       DB_PASS: gostudio123
       DB_NAME: gostudio
