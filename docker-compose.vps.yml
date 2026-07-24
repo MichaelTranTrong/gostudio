@@ -1,0 +1,33 @@
+# Override cho bản VPS — BẬT chức năng tài khoản (đăng nhập/đăng ký).
+#
+# Dùng chung với file gốc:
+#   docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build
+#
+# Bản local KHÔNG dùng file này → AUTH_ENABLED tắt → chạy như cũ, không cần đăng nhập.
+#
+# Yêu cầu: Go Keep đã chạy trên cùng VPS (docker-compose ở ~/gokeep),
+# tạo sẵn network "gokeep_default" và container "gokeep_mysql".
+
+services:
+  app:
+    environment:
+      # Bật lớp tài khoản
+      AUTH_ENABLED: "true"
+      # Bí mật lấy từ file .env (gitignored, không lộ lên repo public). Xem .env.example.
+      # gokeep_mysql = container_name MySQL bên Go Keep; nối được nhờ network bên dưới.
+      GOKEEP_DB_DSN: "${GOKEEP_DB_DSN:?Chưa đặt GOKEEP_DB_DSN trong .env}"
+      # Secret ký JWT của RIÊNG Go Studio (không cần trùng Go Keep).
+      JWT_SECRET: "${JWT_SECRET:?Chưa đặt JWT_SECRET trong .env}"
+      # Service gửi email xác thực (dùng chung với Go Keep) — không bí mật, để thẳng.
+      NOTIFY_URL: "https://notify.zalink.io.vn"
+      # Địa chỉ gốc của Go Studio (proxy host nginx) — dùng để dựng link xác thực trong email.
+      APP_URL: "https://gostudio.zalink.io.vn"
+    networks:
+      - default
+      - gokeep
+
+networks:
+  # Tham chiếu network sẵn có của Go Keep để app thấy được container gokeep_mysql.
+  gokeep:
+    external: true
+    name: gokeep_default

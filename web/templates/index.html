@@ -5,8 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Go Studio</title>
   <link rel="stylesheet" href="/static/css/style.css"/>
+  <script>window.AUTH_ENABLED = {{ .authEnabled }};</script>
 </head>
 <body>
+
+<!-- Màn đăng nhập / đăng ký (chỉ hiện khi AUTH_ENABLED=true và chưa đăng nhập) -->
+<div id="authOverlay" class="auth-overlay hidden">
+  <div class="auth-box">
+    <div class="auth-logo">🎬 Go Studio</div>
+
+    <!-- Đăng nhập -->
+    <div id="loginPanel">
+      <h2>Đăng nhập</h2>
+      <p class="auth-sub">Dùng tài khoản Go Keep của bạn.</p>
+      <div class="auth-error" id="loginError"></div>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email"/>
+      <label class="auth-label">Mật khẩu</label>
+      <input class="auth-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"/>
+      <button class="auth-btn" id="loginBtn">Đăng nhập</button>
+      <div class="auth-switch">Chưa có tài khoản? <a href="#" id="toRegister">Tạo tài khoản mới</a></div>
+    </div>
+
+    <!-- Đăng ký -->
+    <div id="registerPanel" class="hidden">
+      <h2>Tạo tài khoản Go Keep</h2>
+      <p class="auth-sub">Tạo ngay tại Go Studio — dùng được cho cả Go Keep.</p>
+      <div class="auth-error" id="registerError"></div>
+      <label class="auth-label">Họ tên</label>
+      <input class="auth-input" type="text" id="registerName" placeholder="Nguyễn Văn A" autocomplete="name"/>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="registerEmail" placeholder="you@example.com" autocomplete="email"/>
+      <label class="auth-label">Mật khẩu</label>
+      <input class="auth-input" type="password" id="registerPassword" placeholder="Ít nhất 6 ký tự" autocomplete="new-password"/>
+      <button class="auth-btn" id="registerBtn">Tạo tài khoản</button>
+      <div class="auth-switch">Đã có tài khoản? <a href="#" id="toLogin">Đăng nhập</a></div>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot">
 <header>
   <div class="logo">🎬 Go Studio</div>
   <nav>
@@ -16,7 +54,18 @@
     <a href="#" data-tab="concat">Ghép nối</a>
     <a href="#" data-tab="capture">Quay màn hình</a>
   </nav>
+  <div id="userBox" class="user-box hidden">
+    <span id="userEmail" class="user-email"></span>
+    <button id="logoutBtn" class="btn-logout" type="button">Đăng xuất</button>
+  </div>
 </header>
+
+<!-- Banner nhắc xác thực email (hiện khi email chưa xác thực) -->
+<div id="verifyBanner" class="verify-banner hidden">
+  ⚠️ Email chưa được xác thực. Kiểm tra hộp thư hoặc
+  <a href="#" id="resendLink">gửi lại email xác thực</a>.
+  <span id="resendMsg" class="hidden">✓ Đã gửi!</span>
+</div>
 
 <main>
   <!-- Tab: MP4 → MP3 -->
@@ -261,6 +310,8 @@
     <a id="previewDownload" class="btn-download" href="#">⬇ Tải về</a>
   </div>
 </div>
+
+</div><!-- /#appRoot -->
 
 <script src="/static/js/app.js"></script>
 </body>

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"gostudio/internal/auth"
 	"gostudio/internal/models"
 	"log"
 	"net/http"
@@ -64,7 +65,7 @@ func CaptureUpload(c *gin.Context) {
 		return
 	}
 
-	jobID, err := models.CreateJob(captureType, captureLabel(captureType, originalName))
+	jobID, err := models.CreateJob(captureType, captureLabel(captureType, originalName), auth.UserID(c))
 	if err != nil {
 		os.Remove(storedPath)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})

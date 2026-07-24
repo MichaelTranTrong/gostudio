@@ -228,6 +228,19 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Lưu ý phát hiện khi làm: **patch 1 của fix_stream.py (infer_stream→infer) không còn áp dụng được** — upstream đổi whitespace nên pattern không khớp (build in WARN), app hiện chạy `infer_stream`; TTS vẫn hoạt động bình thường
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
 
+### 27. v1.7.0 — Đăng ký / Đăng nhập (dùng chung tài khoản Go Keep)
+- **Feature flag `AUTH_ENABLED`** (mặc định tắt): **1 codebase duy nhất** cho cả 2 môi trường — bản **local** (auth tắt, chạy y như cũ, không cần đăng nhập) và bản **VPS** (auth bật, đủ chức năng tài khoản). Mọi cập nhật tính năng khác tự đồng bộ vì chung 1 repo; khác biệt chỉ nằm ở biến môi trường.
+- **Dùng chung kho tài khoản với Go Keep:** bản VPS mở **kết nối MySQL thứ 2** tới DB `gokeep` (bảng `users`) qua `GOKEEP_DB_DSN` — tài khoản tạo ở Go Studio cũng là tài khoản Go Keep (chung bảng users). Go Studio + Go Keep deploy **cùng VPS**, nối qua docker network `gokeep_default` (container `gokeep_mysql`).
+- **Backend:**
+  - `internal/auth/` (package mới): JWT HS256 **tự cài bằng stdlib** (không thêm dependency), middleware `RequireAuth`, repo user (bcrypt, khớp schema Go Keep), gửi email xác thực qua `notify.zalink.io.vn` (giống Go Keep, link do Go Studio phát hành).
+  - `internal/handlers/auth.go`: `register`, `login`, `verify-email`, `resend-verify`, `me`. Register tạo user trong `gokeep.users` (email_verified=0) + gửi email xác thực → JWT.
+  - `main.go`: khi `AUTH_ENABLED` → đăng ký route `/api/auth/*` + bọc toàn bộ route media bằng `RequireAuth`; endpoint capture (native app) luôn để ngoài (dùng token riêng). Truyền cờ `authEnabled` vào template.
+  - **JWT session RIÊNG của Go Studio** (JWT_SECRET riêng, không cần trùng Go Keep) — dùng chung *credentials*, không dùng chung *session*.
+- **Tách dữ liệu theo user:** thêm cột `jobs.user_id` (nullable). Mọi thao tác job lọc/kiểm tra theo `user_id`; `userID=0` (local) = không lọc → hành vi cũ. User không thấy/không xóa được job của người khác (đã test: GET/DELETE job người khác → 404).
+- **Frontend:** trang Đăng nhập/Đăng ký (overlay `#authOverlay`, ẩn `#appRoot` tới khi đăng nhập), banner "email chưa xác thực + gửi lại", nút Đăng xuất. Wrapper `window.fetch` tự gắn `Authorization: Bearer`; token lưu **localStorage + cookie** (cookie để thẻ `<img>/<video>/<a download>` gửi token được — header không gắn vào các thẻ này). Chỉ hiện khi `window.AUTH_ENABLED===true`; tắt thì giao diện cũ nguyên vẹn.
+- **Deploy:** `docker-compose.yml` giữ nguyên cho local. Thêm **`docker-compose.vps.yml`** (override) set `AUTH_ENABLED`, `GOKEEP_DB_DSN`, `JWT_SECRET`, `NOTIFY_URL`, `APP_URL` + nối network `gokeep_default`. Chạy VPS: `docker compose -f docker-compose.yml -f docker-compose.vps.yml up -d --build`.
+- **Lưu ý deploy:** đặt `APP_URL` đúng domain Go Studio (link xác thực email dựa vào nó); đổi `JWT_SECRET` thành chuỗi ngẫu nhiên dài.
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -254,12 +267,15 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Lần bấm quay thứ 2 vô tình dừng bản quay 1 | App single-shot nhưng instance cũ còn chạy, URL mới route về nó; nút Bắt đầu rơi vào state `.recording` | Bỏ qua URL mới khi đang quay/lưu; đóng panel = thoát app; nút ⏹ menu bar luôn dừng được |
 | Phím tắt toàn cục (Carbon `RegisterEventHotKey`) không kích hoạt | Đăng ký `status=0` nhưng sự kiện không tới app helper kiểu này (xác nhận qua log: handler không chạy) | Bỏ phím tắt; dùng nút ⏹ trên thanh menu (đúng cách macOS dừng quay) |
 | Migrate lỗi `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — `Error 1064 syntax` | `IF NOT EXISTS` cho `ADD COLUMN` là cú pháp MariaDB, **MySQL 8.4 không hỗ trợ** dù tài liệu dễ gây nhầm | Kiểm tra cột đã tồn tại qua `information_schema.columns` trước, chỉ `ALTER TABLE` nếu chưa có |
+| `<video>/<img>/<a download>` bị 401 khi AUTH bật | Các thẻ này không gắn được header `Authorization` | Middleware `RequireAuth` nhận token từ **cookie** `gostudio_token` ngoài header; frontend lưu token cả localStorage lẫn cookie |
+| `{{ .authEnabled }}` render ra ` false ` (có khoảng trắng) | html/template thêm khoảng trắng khi escape giá trị trong ngữ cảnh `<script>` | Không sao — `window.AUTH_ENABLED =  false ;` vẫn là JS hợp lệ |
 
 ---
 
 ## Đang làm
 
-- Ổn định v1.6.1
+- **v1.7.0 — Đăng ký/Đăng nhập (dùng chung tài khoản Go Keep):** code xong + đã test toàn bộ luồng cục bộ (register/login/me/verify email/cookie-auth/cách ly job theo user). **Chưa deploy VPS, chưa release.**
+  - Trước khi deploy VPS: đảm bảo Go Keep đang chạy trên VPS (network `gokeep_default`), đặt `APP_URL`/`JWT_SECRET` trong `docker-compose.vps.yml`.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
 - Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.6.1
 
@@ -277,6 +293,10 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | `filename*=UTF-8''...` (RFC 5987) cho download | Gin's `FileAttachment` encode sai tên file có dấu cách/tiếng Việt thành `+` |
 | `url.QueryUnescape` cho tên file upload | Browser gửi tên file có thể bị encode `+` thay cho dấu cách trong multipart form |
 | Xóa `<label for="fileInput">` | Label + dropZone click cùng trigger fileInput → dialog mở 2 lần |
+| **1 codebase + feature flag `AUTH_ENABLED`** thay vì 2 phiên bản/nhánh | Cập nhật tính năng tự đồng bộ cả local lẫn VPS, không phải merge tay; chỉ khác biến môi trường |
+| Dùng chung tài khoản Go Keep qua **kết nối MySQL thứ 2** (không proxy API) | Go Studio + Go Keep cùng VPS → nối thẳng `gokeep.users` sạch hơn, không phụ thuộc Go Keep web online |
+| JWT **tự cài bằng stdlib** (HS256) | Tránh thêm dependency; JWT của Go Studio độc lập session với Go Keep |
+| Token lưu **cookie + localStorage** | Cookie cho thẻ media/download (không gắn header được), localStorage cho fetch API |
 
 ---
 
@@ -288,7 +308,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 - [ ] Giới hạn kích thước file upload (hiện tại không giới hạn)
 - [x] Xử lý trùng tên file output (thêm suffix nếu file đã tồn tại) — `uniqueOutputPath` cho job cắt (v1.5.3); các job khác chưa áp dụng
 - [ ] Tự động xóa file upload/output sau N ngày
-- [ ] Thêm xác thực người dùng (login)
+- [x] Thêm xác thực người dùng (login) — v1.7.0 (dùng chung tài khoản Go Keep, feature flag `AUTH_ENABLED`)
 - [ ] Quay video macOS: thu micro, nhân scale Retina (cửa sổ + vùng đã xong ở v1.3.1/v1.3.2)
 
 ---
@@ -315,3 +335,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.5.4 | Đổi tên file trong lịch sử (nút ✏, cột `display_name`, áp dụng cho tên tải về) |
 | v1.6.0 | Ghép nối video/audio (tab Ghép nối, nút + Ghép ở lịch sử, `/api/concat/media`, chuẩn hóa độ phân giải) |
 | v1.6.1 | TTS: bổ sung 6 giọng đọc từ repo model gốc (7 giọng: 3 nam + 4 nữ, Bắc/Nam) + gợi ý thể loại trong dropdown |
+| v1.7.0 | Đăng ký/Đăng nhập dùng chung tài khoản Go Keep (feature flag `AUTH_ENABLED`, JWT, xác thực email, lịch sử job tách theo user) |

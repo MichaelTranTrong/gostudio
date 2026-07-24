@@ -9,7 +9,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// DB là kết nối tới DB riêng của Go Studio (bảng jobs).
 var DB *sql.DB
+
+// AuthDB là kết nối tới DB Go Keep (bảng users) — chỉ mở khi AUTH_ENABLED=true.
+// Go Studio dùng chung kho tài khoản với Go Keep qua kết nối này.
+var AuthDB *sql.DB
 
 func Connect() error {
 	host := getEnv("DB_HOST", "127.0.0.1")
@@ -31,6 +36,25 @@ func Connect() error {
 	return nil
 }
 
+// ConnectAuth mở kết nối tới DB Go Keep để dùng chung tài khoản.
+// DSN đầy đủ lấy từ biến môi trường GOKEEP_DB_DSN.
+func ConnectAuth() error {
+	dsn := os.Getenv("GOKEEP_DB_DSN")
+	if dsn == "" {
+		return fmt.Errorf("GOKEEP_DB_DSN chưa được đặt (bắt buộc khi AUTH_ENABLED=true)")
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return err
+	}
+	if err = db.Ping(); err != nil {
+		return err
+	}
+	AuthDB = db
+	log.Println("Connected to GoKeep account database (auth)")
+	return nil
+}
+
 func Migrate() error {
 	_, err := DB.Exec(`
 		CREATE TABLE IF NOT EXISTS jobs (
@@ -48,18 +72,31 @@ func Migrate() error {
 		return err
 	}
 
+	// MySQL 8.4 không hỗ trợ ADD COLUMN IF NOT EXISTS → kiểm tra trước qua information_schema.
+	if err := addColumnIfMissing("display_name", `ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255) DEFAULT NULL`); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("user_id", `ALTER TABLE jobs ADD COLUMN user_id BIGINT UNSIGNED DEFAULT NULL, ADD INDEX idx_jobs_user (user_id)`); err != nil {
+		return err
+	}
+	return nil
+}
+
+func addColumnIfMissing(column, alterSQL string) error {
 	var exists int
-	err = DB.QueryRow(`
+	err := DB.QueryRow(`
 		SELECT COUNT(*) FROM information_schema.columns
-		WHERE table_schema = DATABASE() AND table_name = 'jobs' AND column_name = 'display_name'
-	`).Scan(&exists)
+		WHERE table_schema = DATABASE() AND table_name = 'jobs' AND column_name = ?
+	`, column).Scan(&exists)
 	if err != nil {
 		return err
 	}
 	if exists == 0 {
-		_, err = DB.Exec(`ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255) DEFAULT NULL`)
+		if _, err := DB.Exec(alterSQL); err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 func getEnv(key, fallback string) string {

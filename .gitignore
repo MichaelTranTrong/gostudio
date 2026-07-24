@@ -6,3 +6,6 @@ outputs/
 # Native macOS capture app — build artifacts
 macos-capture/GoStudioCapture
 macos-capture/*.app/
+
+# Biến bí mật (JWT_SECRET, DSN) — KHÔNG commit lên repo public
+.env

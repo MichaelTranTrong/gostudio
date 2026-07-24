@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"gostudio/internal/auth"
 	"gostudio/internal/models"
 	"io"
 	"log"
@@ -37,7 +38,7 @@ func TextToSpeech(c *gin.Context) {
 		displayText = string([]rune(displayText)[:80]) + "..."
 	}
 
-	jobID, err := models.CreateJob("text_to_speech", "[TTS] "+displayText)
+	jobID, err := models.CreateJob("text_to_speech", "[TTS] "+displayText, auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return

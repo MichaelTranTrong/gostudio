@@ -1,3 +1,157 @@
+// ── Tài khoản (chỉ hoạt động khi AUTH_ENABLED=true — bản VPS) ──
+// Bản local: AUTH_ENABLED=false → app khởi động thẳng, không cần đăng nhập.
+const AUTH_ENABLED = window.AUTH_ENABLED === true;
+const TOKEN_KEY = 'gostudio_token';
+let currentUser = null;
+let _appStarted = false;
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) {
+  localStorage.setItem(TOKEN_KEY, t);
+  // Cookie để các thẻ <img>/<video>/<a download> tự gửi kèm token (không set header được).
+  document.cookie = TOKEN_KEY + '=' + t + '; path=/; max-age=' + (7 * 24 * 3600) + '; samesite=lax';
+}
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+  document.cookie = TOKEN_KEY + '=; path=/; max-age=0';
+}
+
+// Gắn Authorization vào mọi request /api khi đã đăng nhập.
+(function () {
+  const _fetch = window.fetch;
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    const t = getToken();
+    if (t && typeof url === 'string' && url.indexOf('/api') === 0) {
+      opts.headers = Object.assign({}, opts.headers, { Authorization: 'Bearer ' + t });
+    }
+    return _fetch(url, opts);
+  };
+})();
+
+function showAuthError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = msg || ''; el.style.display = msg ? 'block' : 'none'; }
+}
+function showAuthPanel(which) {
+  document.getElementById('loginPanel').classList.toggle('hidden', which !== 'login');
+  document.getElementById('registerPanel').classList.toggle('hidden', which !== 'register');
+  showAuthError('loginError', ''); showAuthError('registerError', '');
+}
+function openAuth() {
+  document.getElementById('authOverlay').classList.remove('hidden');
+  document.getElementById('appRoot').classList.add('hidden');
+}
+function closeAuth() {
+  document.getElementById('authOverlay').classList.add('hidden');
+  document.getElementById('appRoot').classList.remove('hidden');
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) { showAuthError('loginError', 'Vui lòng nhập email và mật khẩu.'); return; }
+  const btn = document.getElementById('loginBtn'); btn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { showAuthError('loginError', data.error || 'Đăng nhập thất bại.'); return; }
+    setToken(data.token); currentUser = data.user; enterApp();
+  } catch (e) { showAuthError('loginError', 'Lỗi kết nối máy chủ.'); }
+  finally { btn.disabled = false; }
+}
+
+async function doRegister() {
+  const name = document.getElementById('registerName').value.trim();
+  const email = document.getElementById('registerEmail').value.trim();
+  const password = document.getElementById('registerPassword').value;
+  if (!name || !email || !password) { showAuthError('registerError', 'Vui lòng nhập đầy đủ thông tin.'); return; }
+  if (password.length < 6) { showAuthError('registerError', 'Mật khẩu phải có ít nhất 6 ký tự.'); return; }
+  const btn = document.getElementById('registerBtn'); btn.disabled = true;
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { showAuthError('registerError', data.error || 'Đăng ký thất bại.'); return; }
+    setToken(data.token); currentUser = data.user; enterApp();
+  } catch (e) { showAuthError('registerError', 'Lỗi kết nối máy chủ.'); }
+  finally { btn.disabled = false; }
+}
+
+function logout() {
+  clearToken(); currentUser = null;
+  updateUserBox(); showAuthPanel('login'); openAuth();
+}
+
+function updateUserBox() {
+  const box = document.getElementById('userBox');
+  if (!box) return;
+  if (currentUser) {
+    box.classList.remove('hidden');
+    document.getElementById('userEmail').textContent = currentUser.email;
+    const banner = document.getElementById('verifyBanner');
+    if (banner) banner.classList.toggle('hidden', !!currentUser.email_verified);
+  } else {
+    box.classList.add('hidden');
+    const banner = document.getElementById('verifyBanner');
+    if (banner) banner.classList.add('hidden');
+  }
+}
+
+async function resendVerify() {
+  const msg = document.getElementById('resendMsg');
+  const res = await fetch('/api/auth/resend-verify', { method: 'POST' });
+  if (res.ok && msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 5000); }
+}
+
+function enterApp() { closeAuth(); updateUserBox(); startApp(); }
+
+function startApp() {
+  loadHistory();
+  if (_appStarted) return;
+  _appStarted = true;
+  setInterval(loadHistory, 8000);
+}
+
+function wireAuthUI() {
+  document.getElementById('loginBtn')?.addEventListener('click', doLogin);
+  document.getElementById('registerBtn')?.addEventListener('click', doRegister);
+  document.getElementById('logoutBtn')?.addEventListener('click', logout);
+  document.getElementById('toRegister')?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('register'); });
+  document.getElementById('toLogin')?.addEventListener('click', e => { e.preventDefault(); showAuthPanel('login'); });
+  document.getElementById('resendLink')?.addEventListener('click', e => { e.preventDefault(); resendVerify(); });
+  document.getElementById('loginPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('registerPassword')?.addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+}
+
+async function boot() {
+  // Thông báo kết quả xác thực email (từ redirect /?verified=...).
+  const params = new URLSearchParams(location.search);
+  const v = params.get('verified');
+  if (v === 'success') alert('✅ Email đã được xác thực! Bạn có thể đăng nhập.');
+  else if (v === 'invalid') alert('⚠️ Liên kết xác thực không hợp lệ hoặc đã hết hạn.');
+  if (v) history.replaceState(null, '', location.pathname);
+
+  if (!AUTH_ENABLED) { startApp(); return; } // bản local: chạy thẳng
+
+  wireAuthUI();
+  const t = getToken();
+  if (!t) { showAuthPanel('login'); openAuth(); return; }
+  try {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) throw new Error('unauth');
+    currentUser = await res.json();
+    enterApp();
+  } catch (e) {
+    clearToken(); showAuthPanel('login'); openAuth();
+  }
+}
+
 // ── Tab switching ──────────────────────────────────────────────
 document.querySelectorAll('nav a[data-tab]').forEach(link => {
   link.addEventListener('click', e => {
@@ -756,5 +910,4 @@ function labelStatus(s) {
   return { pending: 'Chờ', processing: 'Đang xử lý', done: 'Hoàn thành', failed: 'Lỗi' }[s] || s;
 }
 
-loadHistory();
-setInterval(loadHistory, 8000);
+boot();

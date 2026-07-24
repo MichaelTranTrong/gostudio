@@ -399,3 +399,99 @@ select:focus { border-color: var(--accent); }
 .modal-body audio { width: 360px; max-width: 80vw; }
 
 .hidden { display: none !important; }
+
+/* ── Đăng nhập / Đăng ký ─────────────────────────────────────── */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--bg);
+}
+.auth-box {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 34px 30px;
+}
+.auth-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 22px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.auth-box h2 { font-size: 1.25rem; margin-bottom: 4px; }
+.auth-sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 18px; }
+.auth-label { display: block; font-size: 0.82rem; color: var(--muted); margin: 12px 0 6px; }
+.auth-input {
+  width: 100%;
+  padding: 11px 13px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.auth-input:focus { outline: none; border-color: var(--accent); }
+.auth-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), #8b80ff);
+}
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-switch { margin-top: 18px; text-align: center; font-size: 0.88rem; color: var(--muted); }
+.auth-switch a { color: var(--accent); text-decoration: none; font-weight: 600; }
+.auth-switch a:hover { text-decoration: underline; }
+.auth-error {
+  display: none;
+  background: rgba(255,101,132,0.12);
+  border: 1px solid var(--accent2);
+  color: var(--accent2);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+/* Ô tài khoản trên header */
+.user-box { display: flex; align-items: center; gap: 12px; }
+.user-email { color: var(--muted); font-size: 0.85rem; }
+.btn-logout {
+  padding: 7px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn-logout:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* Banner nhắc xác thực email */
+.verify-banner {
+  background: rgba(255,193,7,0.12);
+  border-bottom: 1px solid #f9ab00;
+  color: #f9ab00;
+  padding: 10px 40px;
+  text-align: center;
+  font-size: 0.88rem;
+}
+.verify-banner a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.verify-banner a:hover { text-decoration: underline; }
+#resendMsg { margin-left: 8px; color: var(--success); }

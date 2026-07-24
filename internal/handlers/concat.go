@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"gostudio/internal/auth"
 	"gostudio/internal/models"
 	"log"
 	"mime/multipart"
@@ -61,7 +62,7 @@ func ConcatMedia(c *gin.Context) {
 		var fh *multipart.FileHeader
 
 		if item.Type == "source" {
-			src, err := models.GetJob(item.ID)
+			src, err := models.GetJobOwned(item.ID, auth.UserID(c))
 			if err != nil || src.Status != "done" || src.OutputFile == "" {
 				c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("File nguồn #%d chưa sẵn sàng", i+1)})
 				return
@@ -130,7 +131,7 @@ func ConcatMedia(c *gin.Context) {
 	if kind == "audio" {
 		jobType = "audio_concat"
 	}
-	jobID, err := models.CreateJob(jobType, fmt.Sprintf("[Ghép] %d file", len(inputs)))
+	jobID, err := models.CreateJob(jobType, fmt.Sprintf("[Ghép] %d file", len(inputs)), auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return

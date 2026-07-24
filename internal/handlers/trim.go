@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"gostudio/internal/auth"
 	"gostudio/internal/models"
 	"log"
 	"net/http"
@@ -62,7 +63,7 @@ func TrimMedia(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "source_id không hợp lệ"})
 			return
 		}
-		src, err := models.GetJob(id)
+		src, err := models.GetJobOwned(id, auth.UserID(c))
 		if err != nil || src.Status != "done" || src.OutputFile == "" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "File nguồn chưa sẵn sàng"})
 			return
@@ -109,7 +110,7 @@ func TrimMedia(c *gin.Context) {
 	if audioExts[ext] {
 		jobType = "audio_trim"
 	}
-	jobID, err := models.CreateJob(jobType, displayInput)
+	jobID, err := models.CreateJob(jobType, displayInput, auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return

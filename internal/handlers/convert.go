@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"gostudio/internal/auth"
 	"gostudio/internal/models"
 	"log"
 	"net/http"
@@ -46,7 +47,7 @@ func ConvertMP4ToMP3(c *gin.Context) {
 		return
 	}
 
-	jobID, err := models.CreateJob("mp4_to_mp3", inputPath)
+	jobID, err := models.CreateJob("mp4_to_mp3", inputPath, auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo job"})
 		return
@@ -85,7 +86,7 @@ func JobStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
 		return
 	}
-	job, err := models.GetJob(id)
+	job, err := models.GetJobOwned(id, auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Không tìm thấy job"})
 		return
@@ -100,8 +101,8 @@ func DeleteJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
 		return
 	}
-	if err := models.DeleteJob(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := models.DeleteJob(id, auth.UserID(c)); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Không tìm thấy job"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Đã xóa"})
@@ -127,8 +128,8 @@ func RenameJob(c *gin.Context) {
 		return
 	}
 	name = filepath.Base(name) // chặn path traversal, chỉ giữ tên file
-	if err := models.RenameJob(id, name); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := models.RenameJob(id, name, auth.UserID(c)); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Không tìm thấy job"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Đã đổi tên", "display_name": name})
@@ -136,7 +137,7 @@ func RenameJob(c *gin.Context) {
 
 // DeleteAllJobs xóa toàn bộ lịch sử và reset AUTO_INCREMENT.
 func DeleteAllJobs(c *gin.Context) {
-	if err := models.DeleteAllJobs(); err != nil {
+	if err := models.DeleteAllJobs(auth.UserID(c)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -145,7 +146,7 @@ func DeleteAllJobs(c *gin.Context) {
 
 // JobList returns all jobs.
 func JobList(c *gin.Context) {
-	jobs, err := models.ListJobs()
+	jobs, err := models.ListJobs(auth.UserID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -171,7 +172,7 @@ func serveOutput(c *gin.Context, disposition string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id không hợp lệ"})
 		return
 	}
-	job, err := models.GetJob(id)
+	job, err := models.GetJobOwned(id, auth.UserID(c))
 	if err != nil || job.Status != "done" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File chưa sẵn sàng hoặc không tồn tại"})
 		return

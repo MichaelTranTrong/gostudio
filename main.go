@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gostudio/internal/auth"
 	"gostudio/internal/database"
 	"gostudio/internal/handlers"
 	"log"
@@ -25,37 +26,68 @@ func main() {
 		log.Fatalf("DB migrate error: %v", err)
 	}
 
+	authEnabled := auth.Enabled()
+	if authEnabled {
+		// Bản VPS: nối tới kho tài khoản dùng chung với Go Keep.
+		if err := database.ConnectAuth(); err != nil {
+			log.Fatalf("Auth DB connect error: %v", err)
+		}
+		log.Println("🔐 AUTH_ENABLED=true — bật đăng nhập/đăng ký (dùng chung tài khoản Go Keep)")
+	} else {
+		log.Println("🔓 AUTH_ENABLED tắt — chạy chế độ local, không cần đăng nhập")
+	}
+
 	r := gin.Default()
 
 	// Serve HTML templates
 	r.LoadHTMLGlob("web/templates/*")
 	r.Static("/static", "./web/static")
 
-	// UI
+	// UI — truyền cờ authEnabled cho frontend biết có cần hiện màn đăng nhập không.
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(200, "index.html", nil)
+		c.HTML(200, "index.html", gin.H{"authEnabled": authEnabled})
 	})
 
-	// API
 	api := r.Group("/api")
-	{
-		api.POST("/convert/mp4-to-mp3", handlers.ConvertMP4ToMP3)
-		api.POST("/trim/media", handlers.TrimMedia)
-		api.POST("/concat/media", handlers.ConcatMedia)
-		api.POST("/capture/upload", handlers.CaptureUpload)
-		api.POST("/tts", handlers.TextToSpeech)
-		api.GET("/voices", handlers.GetVoices)
-		api.GET("/jobs", handlers.JobList)
-		api.GET("/jobs/:id", handlers.JobStatus)
-		api.DELETE("/jobs/:id", handlers.DeleteJob)
-		api.PATCH("/jobs/:id/rename", handlers.RenameJob)
-		api.DELETE("/jobs", handlers.DeleteAllJobs)
-		api.GET("/download/:id", handlers.DownloadOutput)
-		api.GET("/preview/:id", handlers.PreviewOutput)
+
+	// Endpoint capture của native app macOS dùng token riêng (không phải JWT user),
+	// nên luôn để ngoài lớp đăng nhập.
+	api.POST("/capture/upload", handlers.CaptureUpload)
+
+	if authEnabled {
+		// Route auth công khai (chưa đăng nhập vẫn gọi được).
+		ag := api.Group("/auth")
+		ag.POST("/register", handlers.Register)
+		ag.POST("/login", handlers.Login)
+		ag.GET("/verify-email", handlers.VerifyEmail)
+		ag.GET("/me", auth.RequireAuth(), handlers.Me)
+		ag.POST("/resend-verify", auth.RequireAuth(), handlers.ResendVerify)
+
+		// Mọi route media yêu cầu đăng nhập.
+		registerMediaRoutes(api.Group("", auth.RequireAuth()))
+	} else {
+		registerMediaRoutes(api)
 	}
 
 	log.Println("Go Studio đang chạy tại http://localhost:2005")
 	if err := r.Run(":2005"); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// registerMediaRoutes gắn toàn bộ route xử lý media lên group g.
+// Local: g = /api (không chặn). VPS: g = /api có RequireAuth.
+func registerMediaRoutes(g *gin.RouterGroup) {
+	g.POST("/convert/mp4-to-mp3", handlers.ConvertMP4ToMP3)
+	g.POST("/trim/media", handlers.TrimMedia)
+	g.POST("/concat/media", handlers.ConcatMedia)
+	g.POST("/tts", handlers.TextToSpeech)
+	g.GET("/voices", handlers.GetVoices)
+	g.GET("/jobs", handlers.JobList)
+	g.GET("/jobs/:id", handlers.JobStatus)
+	g.DELETE("/jobs/:id", handlers.DeleteJob)
+	g.PATCH("/jobs/:id/rename", handlers.RenameJob)
+	g.DELETE("/jobs", handlers.DeleteAllJobs)
+	g.GET("/download/:id", handlers.DownloadOutput)
+	g.GET("/preview/:id", handlers.PreviewOutput)
 }
