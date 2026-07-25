@@ -1,7 +1,11 @@
 """Patches áp dụng lên VieNeu-TTS khi build image.
 
 1. web_stream.py: dùng infer() (non-streaming) thay infer_stream().
-   Bản streaming GGUF bị lỗi ghép nhầm reference audio vào output.
+   Nhánh streaming GGUF ghép audio từ các cửa sổ chồng lấp
+   (lookback/lookforward) -> đôi khi nhân đôi đoạn audio, nghe thành
+   LẶP CHỮ. infer() sinh 1 lần rồi decode nên không có lỗi ghép này.
+   Kèm hạ temperature=0.7, top_k=30 để giảm lấy mẫu chệch vào vòng lặp.
+   (Dùng regex vì upstream hay đổi khoảng trắng khiến khớp nguyên khối hỏng.)
 
 2. standard.py: bật use_chat_format cho mọi model VieNeu-TTS.
    Heuristic gốc chỉ bật cho repo v1 'pnnbao-ump/VieNeu-TTS', khiến
@@ -12,54 +16,33 @@
    (pnnbao-ump/VieNeu-TTS-0.3B-q4-gguf — 6 giọng nam/nữ Bắc/Nam)
    vào model đang chạy. Bản fine-tune ngoc-huyen chỉ có 1 giọng
    trong voices.json; voice codes dùng chung codec nên nạp lẫn được.
+
+4. standard.py: thêm repeat_penalty=1.3 vào lệnh sinh GGUF
+   (_infer_ggml + _infer_stream_ggml). Model tự hồi quy đôi khi kẹt
+   vòng lặp -> lặp cụm từ; lệnh sinh gốc không truyền repeat_penalty.
 """
 
-# ── Patch 1: web_stream.py ────────────────────────────────────
+import re
+
+# ── Patch 1: web_stream.py — infer_stream -> infer (regex) ────
 p1 = '/app/apps/web_stream.py'
 c1 = open(p1).read()
 
-old1 = '''    def audio_generator():
-        header = io.BytesIO()
-        with wave.open(header, 'wb') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(24000)
-            wav_file.setnframes(100_000_000)
-        yield header.getvalue()
+# Thay cả khối từ "start = time.time()" tới hết except bằng 1 lần infer().
+pat1 = re.compile(r"        start = time\.time\(\).*?        except Exception as e:", re.S)
+new1 = (
+    "        try:\n"
+    "            wav = tts.infer(text, voice=voice_data, temperature=0.7, top_k=30)\n"
+    "            yield float32_to_pcm16(wav)\n"
+    "        except Exception as e:"
+)
 
-        start = time.time()
-        count = 0
-        try:
-            for chunk in tts.infer_stream(text, voice=voice_data):
-                if count == 0:
-                     print(f"⚡ First sound in {time.time() - start:.3f}s")
-                count += 1
-                yield float32_to_pcm16(chunk)
-                time.sleep(0.001)
-
-        except Exception as e:
-            print(f"Error during inference: {e}")'''
-
-new1 = '''    def audio_generator():
-        header = io.BytesIO()
-        with wave.open(header, 'wb') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(24000)
-            wav_file.setnframes(100_000_000)
-        yield header.getvalue()
-
-        try:
-            wav = tts.infer(text, voice=voice_data)
-            yield float32_to_pcm16(wav)
-        except Exception as e:
-            print(f"Error during inference: {e}")'''
-
-if old1 in c1:
-    open(p1, 'w').write(c1.replace(old1, new1))
-    print('Patched web_stream.py: infer_stream -> infer')
+c1_new, n1 = pat1.subn(new1, c1)
+if n1:
+    open(p1, 'w').write(c1_new)
+    print(f'Patched web_stream.py: infer_stream -> infer ({n1} site)')
 else:
-    print('WARN: web_stream.py pattern not found')
+    print('WARN: web_stream.py infer_stream pattern not found')
 
 # ── Patch 2: standard.py ──────────────────────────────────────
 p2 = '/app/src/vieneu/standard.py'
@@ -99,3 +82,18 @@ if old3 in c1:
     print('Patched web_stream.py: merge extra preset voices')
 else:
     print('WARN: web_stream.py merge-voices pattern not found')
+
+# ── Patch 4: standard.py — chống lặp chữ khi sinh GGUF ────────
+# Model tự hồi quy đôi khi kẹt vòng lặp -> lặp lại cụm từ.
+# Lệnh sinh gốc không truyền repeat_penalty (mức mặc định quá nhẹ).
+# Thêm repeat_penalty vào cả _infer_ggml và _infer_stream_ggml.
+c2b = open(p2).read()
+
+old4 = 'temperature=temperature, top_k=top_k, stop=["<|SPEECH_GENERATION_END|>"]'
+new4 = 'temperature=temperature, top_k=top_k, repeat_penalty=1.3, stop=["<|SPEECH_GENERATION_END|>"]'
+
+if old4 in c2b:
+    open(p2, 'w').write(c2b.replace(old4, new4))
+    print('Patched standard.py: added repeat_penalty=1.3 to GGUF generation')
+else:
+    print('WARN: standard.py repeat_penalty pattern not found')

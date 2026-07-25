@@ -254,6 +254,16 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Backend:** route `POST /api/capture/upload` chỉ đăng ký khi `!authEnabled` (local); bản online → 404.
 - Đã test 2 chế độ: online (không có markup capture, endpoint 404) / local (giữ nguyên, endpoint 400).
 
+### 30. v1.7.3 — Sửa TTS lặp chữ (còn sót từ v1.2.1)
+- Bản v1.2.1 đã sửa lỗi TTS đọc câu reference + lặp, nhưng **thỉnh thoảng vẫn lặp cụm từ** (ngẫu nhiên, không phải lần nào cũng). Truy ra **2 nguyên nhân** trong service `vieneu`:
+  1. **App vẫn chạy nhánh `infer_stream`** (không phải `infer`) — Patch 1 cũ của `fix_stream.py` khớp nguyên khối, upstream đổi khoảng trắng nên **hỏng âm thầm** từ v1.6.1. Nhánh streaming GGUF ghép audio từ các cửa sổ chồng lấp (lookback/lookforward) → đôi khi **nhân đôi đoạn audio → nghe thành lặp chữ** (repeat_penalty không chạm tới được). Đây mới là thủ phạm chính.
+  2. **Lệnh sinh GGUF không truyền `repeat_penalty`** — `self.backbone(prompt, ...)` ở `_infer_ggml`/`_infer_stream_ggml` thiếu tham số này (mức mặc định quá nhẹ). Lưu ý: `repetitive_penalty=1.2` đặt lúc load model (standard.py dòng ~112) **sai tên tham số** → llama-cpp bỏ qua, xưa nay vô tác dụng.
+- **Cách sửa** (đều qua `vieneu/fix_stream.py`, áp lúc build):
+  - **Patch 1 viết lại bằng regex** (bền với thay đổi khoảng trắng): chuyển hẳn app sang `tts.infer(text, voice=..., temperature=0.7, top_k=30)` (non-streaming, không có lỗi ghép cửa sổ) — hạ `temperature` 1.0→0.7, `top_k` 50→30 để giảm lấy mẫu chệch vào vòng lặp.
+  - **Patch 4 mới:** thêm `repeat_penalty=1.3` vào 2 lệnh sinh GGUF (`_infer_ggml` + `_infer_stream_ggml`).
+- **Kiểm chứng bằng thống kê** (vì lỗi ngẫu nhiên, nghe 1-2 lần không kết luận được): stress-test 1 đoạn 25 lần, đo độ dài audio mỗi lần — vòng lặp sẽ tạo clip dài đột biến. Kết quả: **25/25 OK, độ dài 12.99–13.29s, std 0.08s, 0 ca nghi-lặp, 0 ca trơ-header**. Bản cũ từng bắt được ca "trơ-header" (server trả mỗi header WAV, không có tiếng); bản mới không tái diễn.
+- **Lưu ý build:** `fix_stream.py` chạy ở Dockerfile dòng 16, **trước** khi biên dịch `llama-cpp-python` (dòng 20) → đổi file này khiến rebuild biên dịch lại llama-cpp (vài phút). Rebuild bằng `docker compose up -d --build vieneu`.
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -282,6 +292,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Migrate lỗi `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — `Error 1064 syntax` | `IF NOT EXISTS` cho `ADD COLUMN` là cú pháp MariaDB, **MySQL 8.4 không hỗ trợ** dù tài liệu dễ gây nhầm | Kiểm tra cột đã tồn tại qua `information_schema.columns` trước, chỉ `ALTER TABLE` nếu chưa có |
 | `<video>/<img>/<a download>` bị 401 khi AUTH bật | Các thẻ này không gắn được header `Authorization` | Middleware `RequireAuth` nhận token từ **cookie** `gostudio_token` ngoài header; frontend lưu token cả localStorage lẫn cookie |
 | `{{ .authEnabled }}` render ra ` false ` (có khoảng trắng) | html/template thêm khoảng trắng khi escape giá trị trong ngữ cảnh `<script>` | Không sao — `window.AUTH_ENABLED =  false ;` vẫn là JS hợp lệ |
+| TTS **thỉnh thoảng** lặp cụm từ (dù v1.2.1 đã sửa lặp cơ bản) | (1) App chạy nhánh `infer_stream` (Patch 1 khớp nguyên khối, hỏng âm thầm khi upstream đổi whitespace) → ghép cửa sổ chồng lấp nhân đôi audio; (2) lệnh sinh GGUF thiếu `repeat_penalty` (`repetitive_penalty=1.2` lúc load model sai tên → vô tác dụng) | v1.7.3: Patch 1 viết lại bằng **regex** chuyển sang `infer` non-streaming + `temperature=0.7`/`top_k=30`; thêm `repeat_penalty=1.3` vào lệnh sinh. Kiểm chứng bằng stress-test 25× đo độ dài (std 0.08s, 0 outlier) |
 
 ---
 
@@ -294,7 +305,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
   - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.2
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.3
 
 ---
 
@@ -357,3 +368,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.7.0 | Đăng ký/Đăng nhập dùng chung tài khoản Go Keep (feature flag `AUTH_ENABLED`, JWT, xác thực email, lịch sử job tách theo user) |
 | v1.7.1 | Quên mật khẩu / Đặt lại mật khẩu qua email + tự đăng xuất khi token hết hạn |
 | v1.7.2 | Ẩn quay/chụp màn hình khỏi bản online (chỉ dùng local trên macOS) |
+| v1.7.3 | Sửa TTS thỉnh thoảng lặp chữ (chuyển sang `infer` non-streaming + `repeat_penalty` + hạ temperature) |

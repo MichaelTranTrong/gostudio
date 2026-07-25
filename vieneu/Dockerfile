@@ -8,7 +8,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-RUN git clone --depth=1 https://github.com/pnnbao97/VieNeu-TTS.git .
+# Ghim commit upstream (2026-07-06). KHÔNG dùng --depth=1 / HEAD:
+# upstream đã viết lại lớn (V3TurboVieNeuTTS, đổi tên giọng, 48kHz) làm hỏng
+# tích hợp + các patch trong fix_stream.py. Đây là bản mọi patch khớp.
+RUN git clone https://github.com/pnnbao97/VieNeu-TTS.git . \
+    && git checkout 9526b5ca17878d6fd0ec5327f1107af9cd963f39
 
 RUN sed -i 's/host="127\.0\.0\.1"/host="0.0.0.0"/g' apps/web_stream.py
 RUN sed -i 's/VieNeu-TTS-v2-Q4-K-M\.gguf/VieNeu-TTS-0.3B-ngoc-huyen-Q4_0.gguf/g' src/vieneu/standard.py
