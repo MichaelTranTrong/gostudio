@@ -264,6 +264,14 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Kiểm chứng bằng thống kê** (vì lỗi ngẫu nhiên, nghe 1-2 lần không kết luận được): stress-test 1 đoạn 25 lần, đo độ dài audio mỗi lần — vòng lặp sẽ tạo clip dài đột biến. Kết quả: **25/25 OK, độ dài 12.99–13.29s, std 0.08s, 0 ca nghi-lặp, 0 ca trơ-header**. Bản cũ từng bắt được ca "trơ-header" (server trả mỗi header WAV, không có tiếng); bản mới không tái diễn.
 - **Lưu ý build:** `fix_stream.py` chạy ở Dockerfile dòng 16, **trước** khi biên dịch `llama-cpp-python` (dòng 20) → đổi file này khiến rebuild biên dịch lại llama-cpp (vài phút). Rebuild bằng `docker compose up -d --build vieneu`.
 
+### 31. v1.7.4 — Sửa chụp/quay theo cửa sổ (dropdown + cửa sổ ở Space khác)
+- **Lỗi:** chụp ảnh "Cửa sổ" ra ảnh **trong suốt 100%, cỡ cả màn hình** (2880×1800). Nguyên nhân: app **Paperman** có cửa sổ trong suốt phủ toàn màn hình ở **layer 1000** (trên mọi cửa sổ) → chế độ click-chọn `screencapture -i -w` luôn bắt nhầm overlay đó. Không phải lỗi tham số.
+- **Chụp ảnh cửa sổ giờ dùng dropdown** (như quay video) → chụp theo windowID: `screencapture -l<id> -o -x` (không tương tác, không bị overlay che, bỏ bóng đổ `-o`; `-C` nếu không ẩn con trỏ). Hàm mới `Screenshotter.captureWindow`.
+- **Lọc dropdown:** thêm `windowLayer == 0` (chỉ cửa sổ ứng dụng thường; loại overlay/menu bar/panel nổi — Paperman có title nên trước đó còn lọt vào dropdown quay video).
+- **Dropdown liệt kê cả cửa sổ ở Space khác** (`onScreenWindowsOnly: false`, cửa sổ đang hiện xếp đầu): trước chỉ lấy on-screen → khi đang ở app toàn màn hình, dropdown chỉ còn 1 cửa sổ. Đã kiểm chứng `screencapture -l` và `SCContentFilter(desktopIndependentWindow:)` đều nhận được nội dung cửa sổ ở Space khác.
+- **Quay video cửa sổ đứng yên bị co về ~0s:** recorder bỏ frame không `.complete`; cửa sổ ở Space khác/đứng yên gần như toàn frame `.idle` → video chỉ vài frame, thời lượng co lại. Sửa (`ScreenRecorder.swift`): nhớ frame cuối + PTS cuối, khi dừng ghi lại frame cuối tại PTS cuối (`CMSampleBufferCreateCopyWithNewTiming`) rồi `endSession` **sau đó 1/60s** (kết thúc đúng tại PTS frame cuối sẽ cắt mất frame đó). Test quay 4s: 3 cửa sổ đều ~4.28s.
+- Chỉ sửa native app (`macos-capture/`), rebuild bằng `./build.sh`.
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -292,6 +300,9 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Migrate lỗi `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — `Error 1064 syntax` | `IF NOT EXISTS` cho `ADD COLUMN` là cú pháp MariaDB, **MySQL 8.4 không hỗ trợ** dù tài liệu dễ gây nhầm | Kiểm tra cột đã tồn tại qua `information_schema.columns` trước, chỉ `ALTER TABLE` nếu chưa có |
 | `<video>/<img>/<a download>` bị 401 khi AUTH bật | Các thẻ này không gắn được header `Authorization` | Middleware `RequireAuth` nhận token từ **cookie** `gostudio_token` ngoài header; frontend lưu token cả localStorage lẫn cookie |
 | `{{ .authEnabled }}` render ra ` false ` (có khoảng trắng) | html/template thêm khoảng trắng khi escape giá trị trong ngữ cảnh `<script>` | Không sao — `window.AUTH_ENABLED =  false ;` vẫn là JS hợp lệ |
+| Chụp ảnh cửa sổ ra ảnh trong suốt cỡ cả màn hình | App Paperman có cửa sổ trong suốt full màn hình ở layer 1000 → click-chọn `screencapture -i -w` bắt nhầm nó | v1.7.4: chọn cửa sổ bằng dropdown (lọc `windowLayer == 0`) + `screencapture -l<id> -o` |
+| Dropdown cửa sổ chỉ có 1 mục | Lấy `onScreenWindowsOnly: true`; đang ở app toàn màn hình thì cửa sổ khác đều ở Space khác | v1.7.4: lấy cả cửa sổ off-screen (ảnh + video vẫn nhận được nội dung) |
+| Video quay cửa sổ đứng yên/ở Space khác bị co về ~0s | Recorder bỏ frame `.idle` → chỉ còn vài frame `.complete`, track kết thúc ở frame cuối | v1.7.4: khi dừng ghi lại frame cuối tại PTS cuối + `endSession` sau đó 1/60s |
 | TTS **thỉnh thoảng** lặp cụm từ (dù v1.2.1 đã sửa lặp cơ bản) | (1) App chạy nhánh `infer_stream` (Patch 1 khớp nguyên khối, hỏng âm thầm khi upstream đổi whitespace) → ghép cửa sổ chồng lấp nhân đôi audio; (2) lệnh sinh GGUF thiếu `repeat_penalty` (`repetitive_penalty=1.2` lúc load model sai tên → vô tác dụng) | v1.7.3: Patch 1 viết lại bằng **regex** chuyển sang `infer` non-streaming + `temperature=0.7`/`top_k=30`; thêm `repeat_penalty=1.3` vào lệnh sinh. Kiểm chứng bằng stress-test 25× đo độ dài (std 0.08s, 0 outlier) |
 
 ---
@@ -305,7 +316,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
   - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.3
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.4
 
 ---
 
@@ -369,3 +380,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.7.1 | Quên mật khẩu / Đặt lại mật khẩu qua email + tự đăng xuất khi token hết hạn |
 | v1.7.2 | Ẩn quay/chụp màn hình khỏi bản online (chỉ dùng local trên macOS) |
 | v1.7.3 | Sửa TTS thỉnh thoảng lặp chữ (chuyển sang `infer` non-streaming + `repeat_penalty` + hạ temperature) |
+| v1.7.4 | Sửa chụp/quay theo cửa sổ: dropdown chọn cửa sổ cho ảnh (`screencapture -l`), liệt kê cả cửa sổ ở Space khác, video cửa sổ đứng yên không còn bị co |

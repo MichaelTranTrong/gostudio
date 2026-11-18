@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // Chụp ảnh màn hình qua công cụ hệ thống /usr/sbin/screencapture.
 enum Screenshotter {
@@ -9,9 +10,18 @@ enum Screenshotter {
         var args: [String]
         switch region {
         case .full:   args = hideCursor ? ["-x"] : ["-C", "-x"]  // full: bật/tắt con trỏ được
-        case .window: args = ["-i", "-w", "-x"]                  // tương tác → con trỏ luôn ẩn
+        case .window: args = ["-i", "-w", "-x"]                  // (dự phòng — app dùng captureWindow)
         case .area:   args = ["-i", "-x"]                        // (dự phòng)
         }
+        args.append(url.path)
+        return run(args, to: url)
+    }
+
+    // Chụp một cửa sổ theo windowID (-l), bỏ bóng đổ (-o). Không tương tác → không bị
+    // overlay trong suốt phủ màn hình bắt nhầm như chế độ click-chọn `-i -w`.
+    static func captureWindow(id: CGWindowID, hideCursor: Bool, to url: URL) -> Bool {
+        var args = ["-l\(id)", "-o", "-x"]
+        if !hideCursor { args.insert("-C", at: 0) }
         args.append(url.path)
         return run(args, to: url)
     }

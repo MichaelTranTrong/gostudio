@@ -17,6 +17,11 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
     private var videoInput: AVAssetWriterInput?
     private var audioInput: AVAssetWriterInput?
     private var sessionStarted = false
+    // Frame idle (nội dung không đổi) bị bỏ, nên cửa sổ đứng yên / ở Space khác có thể chỉ có
+    // vài frame complete → video bị co lại. Giữ frame cuối + mốc thời gian cuối để khi dừng
+    // ghi lại frame cuối tại mốc đó → video đủ thời lượng (hình đứng yên đúng như thực tế).
+    private var lastFrame: CMSampleBuffer?
+    private var lastScreenPTS: CMTime = .invalid
 
     init(outputURL: URL, captureAudio: Bool, window: SCWindow? = nil, hideCursor: Bool = false) {
         self.outputURL = outputURL
@@ -66,10 +71,30 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
 
     func stop() async -> URL? {
         try? await stream?.stopCapture()
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            queue.async { self.appendTailFrame(); cont.resume() }
+        }
         videoInput?.markAsFinished()
         audioInput?.markAsFinished()
         await writer?.finishWriting()
         return writer?.status == .completed ? outputURL : nil
+    }
+
+    // Chạy trên `queue`: lặp lại frame cuối tại mốc thời gian cuối cùng nhận được.
+    private func appendTailFrame() {
+        guard let writer = writer, writer.status == .writing,
+              let last = lastFrame, let input = videoInput, lastScreenPTS.isValid else { return }
+        let lastPTS = CMSampleBufferGetPresentationTimeStamp(last)
+        guard CMTimeCompare(lastScreenPTS, lastPTS) > 0 else { return }
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: lastScreenPTS,
+                                        decodeTimeStamp: .invalid)
+        var copy: CMSampleBuffer?
+        CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: last,
+                                              sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                              sampleBufferOut: &copy)
+        if let copy = copy, input.isReadyForMoreMediaData { input.append(copy) }
+        // Kết thúc sau frame cuối 1 khung (1/60s) — kết thúc ĐÚNG tại PTS của nó sẽ cắt mất frame.
+        writer.endSession(atSourceTime: CMTimeAdd(lastScreenPTS, CMTime(value: 1, timescale: 60)))
     }
 
     // MARK: - Setup
@@ -114,6 +139,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
                 writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
                 sessionStarted = true
             }
+            lastScreenPTS = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
             // Chỉ bỏ qua nếu ĐỌC ĐƯỢC status và nó KHÔNG complete; đọc không ra thì cứ ghi.
             if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
                let raw = attachments.first?[.status] as? Int,
@@ -122,7 +148,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput {
                 return
             }
             if writer.status == .writing, let input = videoInput, input.isReadyForMoreMediaData {
-                input.append(sampleBuffer)
+                if input.append(sampleBuffer) { lastFrame = sampleBuffer }
             }
         } else if type == .audio {
             guard sessionStarted, writer.status == .writing,

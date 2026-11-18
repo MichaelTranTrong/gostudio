@@ -48,7 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Panel điều khiển
 
     private func showControlPanel(for request: CaptureRequest) {
-        let needsWindowPicker = (request.mode == .video && request.region == .window)
+        // Cả chụp ảnh lẫn quay video theo cửa sổ đều chọn qua dropdown — không dùng
+        // click-chọn của `screencapture -i -w` vì nó bắt nhầm overlay trong suốt phủ màn hình
+        // (vd app Paperman ở layer 1000) → ảnh trong suốt cỡ cả màn hình.
+        let needsWindowPicker = (request.region == .window)
         let height: CGFloat = needsWindowPicker ? 205 : 160
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: height),
@@ -64,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusLabel = status
         window.contentView?.addSubview(status)
 
-        // Dropdown chọn cửa sổ (chỉ cho quay video theo cửa sổ).
+        // Dropdown chọn cửa sổ (region=window, cả ảnh lẫn video).
         if needsWindowPicker {
             let popup = NSPopUpButton(frame: NSRect(x: 20, y: 66, width: 320, height: 26))
             popup.addItem(withTitle: "Đang tải danh sách cửa sổ…")
@@ -104,6 +107,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let audio = request.capturesAudio ? "có âm thanh hệ thống" : "không âm thanh"
             return "Quay video — \(region), \(audio).\n" +
                    "Bấm để bắt đầu (đếm ngược 3s để giấu con trỏ); dừng bằng nút ⏹ trên thanh menu."
+        }
+        if request.region == .window {
+            return "Chụp ảnh — cửa sổ.\nChọn cửa sổ trong danh sách rồi bấm chụp."
         }
         return "Chụp ảnh — \(region).\nBấm để chụp."
     }
@@ -147,6 +153,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func beginCapture(_ request: CaptureRequest) {
         switch request.mode {
         case .screenshot:
+            if request.region == .window {
+                guard let win = selectedWindow() else { return }
+                controlWindow?.orderOut(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.doWindowScreenshot(win)
+                }
+                return
+            }
             controlWindow?.orderOut(nil) // ẩn panel để không lọt vào ảnh
             if request.region == .area {
                 // Đợi panel biến mất rồi mở overlay kính lúp (chụp ảnh nền sạch).
@@ -160,12 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         case .video:
             if request.region == .window {
-                let idx = windowPopup?.indexOfSelectedItem ?? -1
-                guard idx >= 0, idx < pickableWindows.count else {
-                    statusLabel?.stringValue = "Chưa chọn được cửa sổ. Hãy chọn trong danh sách rồi bấm lại."
-                    return
-                }
-                beginVideoRecording(window: pickableWindows[idx])
+                guard let win = selectedWindow() else { return }
+                beginVideoRecording(window: win)
             } else if request.region == .area {
                 controlWindow?.orderOut(nil)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -196,17 +206,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    // Cửa sổ đang chọn trong dropdown; nil (kèm nhắc trên panel) nếu chưa chọn được.
+    private func selectedWindow() -> SCWindow? {
+        let idx = windowPopup?.indexOfSelectedItem ?? -1
+        guard idx >= 0, idx < pickableWindows.count else {
+            statusLabel?.stringValue = "Chưa chọn được cửa sổ. Hãy chọn trong danh sách rồi bấm lại."
+            return nil
+        }
+        return pickableWindows[idx]
+    }
+
     // MARK: - Nạp danh sách cửa sổ vào dropdown (region=window)
 
     private func loadWindowsIntoPopup() {
+        // Lấy cả cửa sổ KHÔNG hiện trên màn hình hiện tại (ở Space khác, app toàn màn hình khác…):
+        // `screencapture -l` (ảnh) và SCContentFilter(desktopIndependentWindow:) (video) đều vẫn
+        // nhận được nội dung. Nếu chỉ lấy on-screen thì khi đang ở một app toàn màn hình,
+        // dropdown chỉ còn đúng 1 cửa sổ.
         Task {
-            let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+            let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
             let mine = Bundle.main.bundleIdentifier
             let windows = (content?.windows ?? []).filter {
-                $0.isOnScreen
+                $0.windowLayer == 0          // chỉ cửa sổ ứng dụng thường; bỏ overlay/menu bar/panel nổi
                     && ($0.title?.isEmpty == false)
                     && $0.owningApplication?.bundleIdentifier != mine
                     && $0.frame.width > 80 && $0.frame.height > 80
+            }
+            // Cửa sổ đang hiện lên đầu, rồi theo tên app.
+            .sorted {
+                if $0.isOnScreen != $1.isOnScreen { return $0.isOnScreen }
+                let a = $0.owningApplication?.applicationName ?? "", b = $1.owningApplication?.applicationName ?? ""
+                return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
             }
             await MainActor.run {
                 self.pickableWindows = windows
@@ -264,6 +294,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     } else {
                         self.quit()
                     }
+                }
+            }
+        }
+    }
+
+    // Chụp đúng cửa sổ đã chọn theo windowID (không tương tác, không bị overlay che).
+    private func doWindowScreenshot(_ win: SCWindow) {
+        let output = Config.tempFile(prefix: "screenshot", ext: "png")
+        let hide = request?.hideCursor ?? false
+        DispatchQueue.global().async {
+            let ok = Screenshotter.captureWindow(id: win.windowID, hideCursor: hide, to: output)
+            DispatchQueue.main.async {
+                if ok {
+                    self.uploadAndQuit(fileURL: output, type: "screenshot")
+                } else {
+                    self.quit()
                 }
             }
         }
