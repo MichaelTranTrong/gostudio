@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var windowPopup: NSPopUpButton?
     private var pickableWindows: [SCWindow] = []
     private var cropRect: CGRect?   // vùng cắt cho quay video theo vùng
+    private var lastWindowID: CGWindowID?   // nhớ cửa sổ đã chọn khi giữ app mở để chụp tiếp
 
     // Nếu app chạy mà không kèm URL (vd lần đầu để đăng ký scheme) → thoát sau 3s.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -47,12 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: - Panel điều khiển
 
-    private func showControlPanel(for request: CaptureRequest) {
+    private func showControlPanel(for request: CaptureRequest, message: String? = nil) {
         // Cả chụp ảnh lẫn quay video theo cửa sổ đều chọn qua dropdown — không dùng
         // click-chọn của `screencapture -i -w` vì nó bắt nhầm overlay trong suốt phủ màn hình
         // (vd app Paperman ở layer 1000) → ảnh trong suốt cỡ cả màn hình.
         let needsWindowPicker = (request.region == .window)
-        let height: CGFloat = needsWindowPicker ? 205 : 160
+        let extra: CGFloat = (message == nil) ? 0 : 22   // thêm 1 dòng báo kết quả lượt trước
+        let height: CGFloat = (needsWindowPicker ? 205 : 160) + extra
 
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: height),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -62,8 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         window.center()
 
-        let status = NSTextField(wrappingLabelWithString: describe(request))
-        status.frame = NSRect(x: 20, y: height - 90, width: 320, height: 70)
+        let text = message.map { $0 + "\n" + describe(request) } ?? describe(request)
+        let status = NSTextField(wrappingLabelWithString: text)
+        status.frame = NSRect(x: 20, y: height - 90 - extra, width: 320, height: 70 + extra)
         statusLabel = status
         window.contentView?.addSubview(status)
 
@@ -84,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         primary.keyEquivalent = "\r"
         primaryButton = primary
 
-        let cancel = NSButton(title: "Hủy", target: self, action: #selector(cancelTapped))
+        let cancel = NSButton(title: request.keepOpen ? "Đóng" : "Hủy", target: self, action: #selector(cancelTapped))
         cancel.frame = NSRect(x: 250, y: 18, width: 90, height: 40)
         cancel.bezelStyle = .rounded
 
@@ -190,7 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Chọn vùng (overlay kính lúp) → quay full màn hình → backend cắt vùng bằng FFmpeg.
     private func selectAreaThenRecord() {
         AreaSelector.present { rect in
-            guard let rect = rect else { self.quit(); return }
+            guard let rect = rect else { self.finish(); return }
             self.cropRect = rect
             self.beginVideoRecording(window: nil)
         }
@@ -213,6 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             statusLabel?.stringValue = "Chưa chọn được cửa sổ. Hãy chọn trong danh sách rồi bấm lại."
             return nil
         }
+        lastWindowID = pickableWindows[idx].windowID
         return pickableWindows[idx]
     }
 
@@ -250,6 +254,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         let app = w.owningApplication?.applicationName ?? "?"
                         popup.addItem(withTitle: "\(app) — \(w.title ?? "")")
                     }
+                    // Chụp tiếp (giữ app mở) → chọn lại đúng cửa sổ lần trước nếu còn.
+                    if let id = self.lastWindowID, let i = windows.firstIndex(where: { $0.windowID == id }) {
+                        popup.selectItem(at: i)
+                    }
                     popup.isEnabled = true
                 }
             }
@@ -283,7 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func selectAreaThenScreenshot() {
         AreaSelector.present { rect in
-            guard let rect = rect else { self.quit(); return } // hủy
+            guard let rect = rect else { self.finish(); return } // hủy
             let output = Config.tempFile(prefix: "screenshot", ext: "png")
             let hide = self.request?.hideCursor ?? false
             DispatchQueue.global().async {
@@ -292,7 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     if ok {
                         self.uploadAndQuit(fileURL: output, type: "screenshot")
                     } else {
-                        self.quit()
+                        self.finish(error: true)
                     }
                 }
             }
@@ -309,7 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if ok {
                     self.uploadAndQuit(fileURL: output, type: "screenshot")
                 } else {
-                    self.quit()
+                    self.finish(error: true)
                 }
             }
         }
@@ -325,7 +333,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if ok {
                     self.uploadAndQuit(fileURL: output, type: "screenshot")
                 } else {
-                    self.quit()
+                    self.finish(error: true)
                 }
             }
         }
@@ -344,7 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             do {
                 try await recorder.start()
             } catch {
-                await MainActor.run { self.quit() }
+                await MainActor.run { self.finish(error: true) }
             }
         }
     }
@@ -362,7 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 if let url = url {
                     self.uploadAndQuit(fileURL: url, type: "screen_record")
                 } else {
-                    self.quit()
+                    self.finish(error: true)
                 }
             }
         }
@@ -371,12 +379,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Upload + thoát
 
     private func uploadAndQuit(fileURL: URL, type: String) {
-        Uploader.upload(fileURL: fileURL, type: type, crop: cropRect) { _, _ in
+        Uploader.upload(fileURL: fileURL, type: type, crop: cropRect) { ok, _ in
             DispatchQueue.main.async {
                 try? FileManager.default.removeItem(at: fileURL)
-                self.quit()
+                self.finish(uploaded: ok)
             }
         }
+    }
+
+    /// Kết thúc 1 lượt chụp/quay. Mặc định thoát app (như cũ); nếu yêu cầu có keep=1
+    /// thì dọn trạng thái và hiện lại panel để chụp/quay tiếp mà không phải mở lại app.
+    private func finish(uploaded: Bool? = nil, error: Bool = false) {
+        guard let request = request, request.keepOpen else { quit(); return }
+        if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+        recorder = nil
+        cropRect = nil
+        state = .idle
+        controlWindow?.orderOut(nil)
+        controlWindow = nil
+        let message: String?
+        if error || uploaded == false {
+            message = "⚠️ Lượt vừa rồi không thành công."
+        } else if uploaded == true {
+            message = request.mode == .video ? "✅ Đã gửi video về Go Studio." : "✅ Đã gửi ảnh về Go Studio."
+        } else {
+            message = nil // người dùng hủy chọn vùng
+        }
+        showControlPanel(for: request, message: message)
     }
 
     private func quit() {

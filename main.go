@@ -6,6 +6,8 @@ import (
 	"gostudio/internal/handlers"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,9 +45,14 @@ func main() {
 	r.LoadHTMLGlob("web/templates/*")
 	r.Static("/static", "./web/static")
 
+	// assetVersion = thời điểm khởi động → gắn ?v= vào CSS/JS: mỗi lần rebuild/restart,
+	// trình duyệt buộc tải bản mới thay vì dùng app.js cũ trong cache.
+	assetVersion := strconv.FormatInt(time.Now().Unix(), 10)
+
 	// UI — truyền cờ authEnabled cho frontend biết có cần hiện màn đăng nhập không.
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(200, "index.html", gin.H{"authEnabled": authEnabled})
+		c.Header("Cache-Control", "no-cache") // luôn lấy HTML mới (chứa ?v= mới)
+		c.HTML(200, "index.html", gin.H{"authEnabled": authEnabled, "assetVersion": assetVersion})
 	})
 
 	api := r.Group("/api")

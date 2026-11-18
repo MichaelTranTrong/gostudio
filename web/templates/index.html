@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Go Studio</title>
-  <link rel="stylesheet" href="/static/css/style.css"/>
+  <link rel="stylesheet" href="/static/css/style.css?v={{ .assetVersion }}"/>
   <script>window.AUTH_ENABLED = {{ .authEnabled }};</script>
 </head>
 <body>
@@ -274,6 +274,12 @@
           </label>
         </div>
 
+        <div class="form-group">
+          <label class="check-label">
+            <input type="checkbox" id="shotKeepOpen"/> Giữ app mở để chụp tiếp (không cần bật lại)
+          </label>
+        </div>
+
         <div class="capture-actions">
           <button type="button" id="shotBtn" class="btn-download">📷 Chụp ảnh</button>
         </div>
@@ -300,6 +306,12 @@
             <option value="mic">Micro</option>
             <option value="both">Hệ thống + Micro</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label class="check-label">
+            <input type="checkbox" id="vidKeepOpen"/> Giữ app mở để quay tiếp (không cần bật lại)
+          </label>
         </div>
 
         <p class="hint">Có đếm ngược 3 giây trước khi quay (để giấu con trỏ); dừng bằng nút ⏹ trên thanh menu.</p>
@@ -339,6 +351,6 @@
 
 </div><!-- /#appRoot -->
 
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v={{ .assetVersion }}"></script>
 </body>
 </html>

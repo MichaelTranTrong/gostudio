@@ -272,6 +272,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Quay video cửa sổ đứng yên bị co về ~0s:** recorder bỏ frame không `.complete`; cửa sổ ở Space khác/đứng yên gần như toàn frame `.idle` → video chỉ vài frame, thời lượng co lại. Sửa (`ScreenRecorder.swift`): nhớ frame cuối + PTS cuối, khi dừng ghi lại frame cuối tại PTS cuối (`CMSampleBufferCreateCopyWithNewTiming`) rồi `endSession` **sau đó 1/60s** (kết thúc đúng tại PTS frame cuối sẽ cắt mất frame đó). Test quay 4s: 3 cửa sổ đều ~4.28s.
 - Chỉ sửa native app (`macos-capture/`), rebuild bằng `./build.sh`.
 
+### 32. v1.7.5 — Giữ app Capture mở để chụp/quay tiếp
+- Checkbox mới ở 2 tab con: **"Giữ app mở để chụp tiếp"** / **"…quay tiếp"** (mặc định **tắt** → chụp/quay xong app tự thoát như cũ) → gửi thêm `keep=1` trong URL `gostudio://capture`
+- **Native app:** `CaptureRequest.keepOpen`; mọi chỗ kết thúc lượt (upload xong, lỗi, hủy chọn vùng) đi qua `finish()` — không keep → `quit()`; có keep → dọn state (status item ⏹, recorder, `cropRect`) rồi **hiện lại panel** kèm dòng báo kết quả (✅ đã gửi / ⚠️ không thành công). Nút "Hủy" đổi thành **"Đóng"**; nhớ `lastWindowID` để dropdown chọn sẵn cửa sổ lần trước (danh sách nạp lại mỗi lượt)
+- **Web:** `launchCapture` khi keep thì không dừng theo dõi sau file đầu — mỗi file mới về refresh lịch sử, đếm "Đã nhận N file", đặt lại hạn chờ 3 phút
+- **Chống cache JS/CSS:** lần đầu test vẫn thoát app vì trình duyệt dùng `app.js` cũ trong cache (không gửi `keep=1`). `main.go` gắn `?v=<giờ khởi động>` (`assetVersion`) vào link CSS/JS + `Cache-Control: no-cache` cho trang HTML → mỗi lần rebuild trình duyệt tự tải bản mới
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.5
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -303,6 +310,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Chụp ảnh cửa sổ ra ảnh trong suốt cỡ cả màn hình | App Paperman có cửa sổ trong suốt full màn hình ở layer 1000 → click-chọn `screencapture -i -w` bắt nhầm nó | v1.7.4: chọn cửa sổ bằng dropdown (lọc `windowLayer == 0`) + `screencapture -l<id> -o` |
 | Dropdown cửa sổ chỉ có 1 mục | Lấy `onScreenWindowsOnly: true`; đang ở app toàn màn hình thì cửa sổ khác đều ở Space khác | v1.7.4: lấy cả cửa sổ off-screen (ảnh + video vẫn nhận được nội dung) |
 | Video quay cửa sổ đứng yên/ở Space khác bị co về ~0s | Recorder bỏ frame `.idle` → chỉ còn vài frame `.complete`, track kết thúc ở frame cuối | v1.7.4: khi dừng ghi lại frame cuối tại PTS cuối + `endSession` sau đó 1/60s |
+| Sửa frontend xong nhưng trình duyệt vẫn chạy code cũ | Static không có header cache → trình duyệt dùng `app.js` cũ (log không thấy request `app.js`) | v1.7.5: `?v=assetVersion` cho CSS/JS + `no-cache` cho HTML |
 | TTS **thỉnh thoảng** lặp cụm từ (dù v1.2.1 đã sửa lặp cơ bản) | (1) App chạy nhánh `infer_stream` (Patch 1 khớp nguyên khối, hỏng âm thầm khi upstream đổi whitespace) → ghép cửa sổ chồng lấp nhân đôi audio; (2) lệnh sinh GGUF thiếu `repeat_penalty` (`repetitive_penalty=1.2` lúc load model sai tên → vô tác dụng) | v1.7.3: Patch 1 viết lại bằng **regex** chuyển sang `infer` non-streaming + `temperature=0.7`/`top_k=30`; thêm `repeat_penalty=1.3` vào lệnh sinh. Kiểm chứng bằng stress-test 25× đo độ dài (std 0.08s, 0 outlier) |
 
 ---
@@ -316,7 +324,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
   - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.4
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.5
 
 ---
 
@@ -381,3 +389,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.7.2 | Ẩn quay/chụp màn hình khỏi bản online (chỉ dùng local trên macOS) |
 | v1.7.3 | Sửa TTS thỉnh thoảng lặp chữ (chuyển sang `infer` non-streaming + `repeat_penalty` + hạ temperature) |
 | v1.7.4 | Sửa chụp/quay theo cửa sổ: dropdown chọn cửa sổ cho ảnh (`screencapture -l`), liệt kê cả cửa sổ ở Space khác, video cửa sổ đứng yên không còn bị co |
+| v1.7.5 | Tùy chọn giữ app GoStudio Capture mở để chụp/quay tiếp nhiều lần (mặc định tắt) |

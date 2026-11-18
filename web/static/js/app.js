@@ -736,33 +736,46 @@ document.getElementById('concatForm').addEventListener('submit', async e => {
 
 // ── Chụp ảnh / Quay video (macOS native app) ──────────────────
 function launchCapture(mode, paramObj, hintEl) {
+  const keep = paramObj.keep === '1';
   // Số job hiện tại để phát hiện job mới xuất hiện sau khi capture.
   fetch('/api/jobs').then(r => r.json()).then(jobs => {
-    const before = (jobs || []).length;
+    let before = (jobs || []).length;
 
     const params = new URLSearchParams({ mode, ...paramObj });
     window.location.href = 'gostudio://capture?' + params.toString();
 
+    const verb = mode === 'video' ? 'quay' : 'chụp';
     hintEl.classList.remove('hidden');
-    hintEl.textContent = '📂 Đã mở app GoStudio Capture — bấm "Bắt đầu" trong app để ' +
-      (mode === 'video' ? 'quay.' : 'chụp.') + ' File sẽ tự về lịch sử bên dưới.';
+    hintEl.textContent = '📂 Đã mở app GoStudio Capture — bấm "Bắt đầu" trong app để ' + verb + '.' +
+      (keep ? ' App sẽ giữ mở để ' + verb + ' tiếp; bấm "Đóng" trong app khi xong.' : '') +
+      ' File sẽ tự về lịch sử bên dưới.';
 
     // Theo dõi tới 3 phút (đủ thời gian cấp quyền + quay). Hết giờ chỉ nhắc nhẹ.
-    let waited = 0;
+    // Giữ app mở: mỗi file mới về thì đếm lại từ đầu, tiếp tục theo dõi file kế tiếp.
+    let waited = 0, received = 0;
     const iv = setInterval(async () => {
       waited += 2;
       try {
         const now = await (await fetch('/api/jobs')).json();
-        if ((now || []).length > before) {
-          clearInterval(iv);
-          hintEl.textContent = '✅ Đã nhận file, xem trong lịch sử bên dưới.';
+        const n = (now || []).length;
+        if (n > before) {
+          received += n - before;
+          before = n;
           loadHistory();
-          return;
+          if (!keep) {
+            clearInterval(iv);
+            hintEl.textContent = '✅ Đã nhận file, xem trong lịch sử bên dưới.';
+            return;
+          }
+          waited = 0;
+          hintEl.textContent = '✅ Đã nhận ' + received + ' file — app vẫn mở, ' + verb + ' tiếp được.';
         }
       } catch {}
       if (waited >= 180) {
         clearInterval(iv);
-        hintEl.innerHTML = 'ℹ️ Chưa nhận được file. Nếu app không mở, kiểm tra đã cài <strong>GoStudio Capture</strong> chưa.';
+        if (!received) {
+          hintEl.innerHTML = 'ℹ️ Chưa nhận được file. Nếu app không mở, kiểm tra đã cài <strong>GoStudio Capture</strong> chưa.';
+        }
       }
     }, 2000);
   });
@@ -772,6 +785,7 @@ function launchCapture(mode, paramObj, hintEl) {
 document.getElementById('shotBtn')?.addEventListener('click', () => {
   const p = { region: document.getElementById('shotRegion').value };
   if (document.getElementById('shotHideCursor').checked) p.cursor = 'hide';
+  if (document.getElementById('shotKeepOpen').checked) p.keep = '1';
   launchCapture('screenshot', p, document.getElementById('shotHint'));
 });
 
@@ -781,6 +795,7 @@ document.getElementById('vidBtn')?.addEventListener('click', () => {
     region: document.getElementById('vidRegion').value,
     audio: document.getElementById('vidAudio').value,
   };
+  if (document.getElementById('vidKeepOpen').checked) p.keep = '1';
   launchCapture('video', p, document.getElementById('vidHint'));
 });
 

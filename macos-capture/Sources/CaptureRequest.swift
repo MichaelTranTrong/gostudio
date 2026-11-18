@@ -10,6 +10,8 @@ struct CaptureRequest {
     let region: CaptureRegion
     let audio: CaptureAudio
     let hideCursor: Bool
+    /// keep=1 → sau khi chụp/quay xong KHÔNG thoát app, quay lại panel để chụp/quay tiếp.
+    let keepOpen: Bool
     let rawURL: String
 
     init?(url: URL) {
@@ -23,6 +25,7 @@ struct CaptureRequest {
         self.region = CaptureRegion(rawValue: value("region") ?? "full") ?? .full
         self.audio = CaptureAudio(rawValue: value("audio") ?? "none") ?? .none
         self.hideCursor = (value("cursor") == "hide")
+        self.keepOpen = (value("keep") == "1")
         self.rawURL = url.absoluteString
     }
 
