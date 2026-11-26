@@ -19,10 +19,17 @@ RUN sed -i 's/VieNeu-TTS-v2-Q4-K-M\.gguf/VieNeu-TTS-0.3B-ngoc-huyen-Q4_0.gguf/g'
 COPY fix_stream.py /tmp/fix_stream.py
 RUN python3 /tmp/fix_stream.py
 
-RUN uv sync
+# --frozen: cài đúng theo uv.lock, KHÔNG resolve lại. uv.lock upstream trỏ tới
+# wheel Windows trên GitHub release (llama_cpp_python-0.3.16-...-win_amd64.whl)
+# đã bị xóa (404) → `uv sync` thường phải tải metadata wheel đó và fail.
+RUN uv sync --frozen
 
-RUN uv pip install trafilatura llama-cpp-python
+# Ghim 0.3.34 (bản đang chạy ổn định) — không để tự lên bản mới.
+RUN uv pip install trafilatura llama-cpp-python==0.3.34
 
 EXPOSE 8001
 
-CMD ["uv", "run", "vieneu-stream"]
+# --no-sync: `uv run` mặc định sync lại env theo lock MỖI LẦN khởi động →
+# dính 404 ở trên → container crash-loop; đồng thời sẽ gỡ llama-cpp-python
+# cài thêm ở trên (không có trong lock).
+CMD ["uv", "run", "--no-sync", "vieneu-stream"]
