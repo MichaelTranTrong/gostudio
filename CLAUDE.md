@@ -286,6 +286,13 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - Đã kiểm chứng: rebuild thành công, đủ 7 giọng, tạo MP3 qua `/api/tts` OK
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.6
 
+### 34. v1.7.7 — TTS: chống đọc lặp kéo dài + chống crash khi chạy song song
+- **Lặp kéo dài ở câu liệt kê dài**: `infer()` chia đoạn tối đa 256 ký tự → đoạn ~250 ký tự khiến model không biết dừng. Sửa: `max_chars=160` (patch 1) + **patch 5** chốt chặn `max_tokens = len(phonemes)*3.2 + 100`, chạm trần → đọc lại tối đa 3 lần (log `Runaway speech`); không khớp pattern thì dừng build
+- **Patch 6 — crash khi 2 request cùng lúc**: FastAPI chạy generator trong threadpool, 2 request dùng chung 1 context llama.cpp → `llama_decode returned -1` rồi `GGML_ASSERT` (repack.cpp) làm crash container. Thêm `threading.Lock` để infer chạy **tuần tự**; lỗi infer → xóa KV cache (`_reset_backbone`). Patch 1 không khớp giờ **dừng build** (trước chỉ WARN)
+- **Backend** (`internal/handlers/tts.go`): timeout gọi VieNeu 120s → **30 phút** (CPU + chạy tuần tự, đoạn dài fail giữa chừng); báo lỗi rõ hơn — mất kết nối, status ≠ 200, audio rỗng (chỉ header WAV 44 byte)
+- **Chưa hết hẳn**: người dùng nghe lại vẫn thấy "chưa ổn lắm" — xem mục "Đang làm"
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.7
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -320,10 +327,36 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | Sửa frontend xong nhưng trình duyệt vẫn chạy code cũ | Static không có header cache → trình duyệt dùng `app.js` cũ (log không thấy request `app.js`) | v1.7.5: `?v=assetVersion` cho CSS/JS + `no-cache` cho HTML |
 | TTS **thỉnh thoảng** lặp cụm từ (dù v1.2.1 đã sửa lặp cơ bản) | (1) App chạy nhánh `infer_stream` (Patch 1 khớp nguyên khối, hỏng âm thầm khi upstream đổi whitespace) → ghép cửa sổ chồng lấp nhân đôi audio; (2) lệnh sinh GGUF thiếu `repeat_penalty` (`repetitive_penalty=1.2` lúc load model sai tên → vô tác dụng) | v1.7.3: Patch 1 viết lại bằng **regex** chuyển sang `infer` non-streaming + `temperature=0.7`/`top_k=30`; thêm `repeat_penalty=1.3` vào lệnh sinh. Kiểm chứng bằng stress-test 25× đo độ dài (std 0.08s, 0 outlier) |
 | TTS không hoạt động — container `vieneu` restart liên tục, `/api/voices` 503, log `404 ... llama_cpp_python-0.3.16-cp312-cp312-win_amd64.whl` | `uv run` mặc định **sync lại env theo `uv.lock` mỗi lần khởi động**; lock upstream trỏ tới wheel Windows trên GitHub release đã bị xóa → sync fail → crash trước khi server chạy (image cũ vẫn nguyên, chỉ bước khởi động hỏng) | Dockerfile `vieneu`: `uv sync --frozen` (không resolve lại lock) + `CMD uv run --no-sync` + ghim `llama-cpp-python==0.3.34` |
+| TTS lặp **kéo dài** ở câu liệt kê ("một cái gái, một cái gấy…", "thanh cảnh, thanh cảnh…") | Đoạn ~250 ký tự (mặc định `max_chars=256`) khiến model không biết dừng, đọc lặp tới sát giới hạn context | `max_chars=160` + chốt chặn `max_tokens` & đọc lại (patch 5). **Mới đỡ, chưa hết hẳn** — xem mục "Đang làm" |
 
 ---
 
 ## Đang làm
+
+### 🔧 TTS còn đọc lặp từ — TẠM DỪNG, chưa xong (ghi ngày 2026-11-27)
+
+**Trạng thái:** đã sửa được lỗi lặp **kéo dài**, nhưng người dùng nghe lại và đánh giá **"chưa ổn lắm"** (chưa cho biết cụ thể chỗ nào/kiểu gì). Tạm dừng để làm việc khác.
+- Phần sửa hiện tại đã commit/release ở **v1.7.7** (xem mục 34); các lần sửa tiếp theo đặt version mới
+- Container `vieneu` đang chạy **đã gồm bản sửa**. Rollback: image `gostudio-vieneu:backup-v1.7.6` (nhớ hoàn lại cả `fix_stream.py`)
+
+**Nguyên nhân tìm được:** `infer()` chia đoạn tối đa 256 ký tự. Đoạn ~250 ký tự (nhất là **câu liệt kê dài**: "một cái bàn, một cái ghế…", danh sách cảnh giới "…cảnh, …cảnh") khiến model không biết dừng, đọc lặp tới gần/chạm giới hạn context 2048 (~1400 speech token thay vì ~700–900). Tái hiện được ở `repeat_penalty` 1.3 / 1.15 / 1.05 / 1.0 (câu cảnh giới chỉ đo ở 4 mức này, câu liệt kê cũng vậy) → chỉnh riêng penalty không giải quyết được. Stress-test của v1.7.3 chỉ dùng 1 đoạn nên không phát hiện.
+
+**Đã sửa:**
+- `max_chars=160` trong lời gọi `tts.infer` (patch 1)
+- Patch 5 mới: `_infer_ggml` giới hạn `max_tokens = len(phonemes)*3.2 + 100`; chạm trần → đọc lại, tối đa 3 lần, hỏng cả 3 thì lấy bản ngắn nhất (**vẫn có thể lỗi**). Không khớp pattern thì **dừng build**. Log: `Runaway speech`
+
+**Đã kiểm chứng:** 3 câu × 5 lần qua `/stream` đều dài 13–17s, bản chuyển chữ không còn chuỗi lặp kéo dài. Chốt chặn đã test bằng cách ép `max_chars=256` (có kích hoạt). **Chưa** chạy lại nguyên chương (DB chỉ lưu 80 ký tự đầu).
+
+**Còn tồn tại** (theo Whisper, có thể nghe nhầm): "một cái ghế" đôi khi đọc thành "một cái bàn" (nghe như lặp); cụm "đế cảnh" cuối đôi khi đọc thừa; một số từ phát âm sai.
+
+**Làm tiếp:**
+1. Xin người dùng **văn bản đầy đủ** (file `.txt`, không commit) + từ bị lặp + mốc phút:giây trong MP3 + kiểu lặp
+2. Hướng thử (chưa kiểm chứng): đoạn ngắn hơn (110/140) nhưng gộp mẩu cuối quá ngắn (vd "đế cảnh." đứng riêng đọc rất sai); chỉnh `temperature`/`top_k`; hạ ngưỡng chốt chặn (lặp ngắn 1–2 từ có thể không chạm trần 3.2); so với model q4/q8 gốc
+3. Cân nhắc lưu toàn văn text TTS vào DB để tái hiện lỗi được
+
+**Cách dò lỗi lặp (hiệu quả hơn chỉ đo độ dài):** chuyển MP3 thành chữ bằng `faster-whisper` model `small` (`language="vi"`, `condition_on_previous_text=False`) trong container `python:3.12-slim` tạm; cần cài thêm `--only-binary=:all: "av>=13,<17"` (bản `av` mới nhất gây lỗi `metadata_errors`). Tải ~700MB, đã xóa sau khi dùng — lần sau hỏi người dùng trước khi tải lại.
+
+### Hạ tầng / triển khai
 
 - **📵 CHỦ TRƯƠNG HIỆN TẠI: chỉ phát triển LOCAL, KHÔNG deploy lên server nữa.** Các phiên bản sau vẫn làm/chạy trên máy local như cũ (auth tắt, `docker compose up -d`, port 2005). **Không upload lên VPS** cho tới khi có kinh phí nâng cấp server đủ mạnh. Bản online đã gỡ (xem dưới).
 - **🛑 Đã GỠ bản online khỏi VPS (2026-07-25).** VPS (`103.232.122.136`, SSH cổng 2223, user `ubuntu`, thư mục cũ `~/gostudio`) quá nhỏ/yếu, không đủ chạy đầy đủ tính năng (đặc biệt `vieneu`/TTS: disk 90%, RAM căng) → lần chạy online xem như thất bại, đã tháo dỡ để server nhẹ hơn (disk 90%→74%, thu hồi ~4.6GB).
@@ -332,7 +365,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
   - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.6
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.7
 
 ---
 
@@ -358,6 +391,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 
 ## TODO tiếp theo
 
+- [ ] **TTS còn đọc lặp từ** — làm tiếp theo mục "Đang làm" (bản sửa một phần đã ở v1.7.7)
 - [x] Thêm tính năng cắt video/audio (trim theo thời gian) — v1.5.0 (video) + v1.5.1 (audio) + v1.5.2 (player trực quan)
 - [ ] Thêm tính năng chuyển đổi định dạng khác (MP4→WAV, MP4→AAC, ...)
 - [ ] Thêm thanh tiến trình thực từ FFmpeg (parse stderr `-progress`)
@@ -399,3 +433,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.7.4 | Sửa chụp/quay theo cửa sổ: dropdown chọn cửa sổ cho ảnh (`screencapture -l`), liệt kê cả cửa sổ ở Space khác, video cửa sổ đứng yên không còn bị co |
 | v1.7.5 | Tùy chọn giữ app GoStudio Capture mở để chụp/quay tiếp nhiều lần (mặc định tắt) |
 | v1.7.6 | Sửa TTS không hoạt động: container `vieneu` crash-loop do `uv run` sync lại lock trỏ tới wheel đã bị xóa (`--frozen` + `--no-sync`) |
+| v1.7.7 | TTS: chống đọc lặp kéo dài (`max_chars=160` + chốt chặn `max_tokens`/đọc lại), khóa infer tuần tự chống crash, timeout 30 phút (chưa hết hẳn lặp) |

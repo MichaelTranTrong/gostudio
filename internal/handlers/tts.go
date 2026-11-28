@@ -90,7 +90,9 @@ func runTTS(jobID uint64, text, voiceID string) {
 
 	chunks := splitText(text, 2800)
 	ts := time.Now().UnixMilli()
-	client := &http.Client{Timeout: 120 * time.Second}
+	// VieNeu chạy CPU + xử lý tuần tự: 1 đoạn 2800 ký tự có thể mất vài phút,
+	// cộng thời gian chờ request khác. 120s cũ làm job dài fail giữa chừng.
+	client := &http.Client{Timeout: 30 * time.Minute}
 
 	var wavFiles []string
 	defer func() {
@@ -112,8 +114,18 @@ func runTTS(jobID uint64, text, voiceID string) {
 		}
 		wavBytes, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if err != nil || resp.StatusCode != 200 {
-			_ = models.UpdateJob(jobID, "failed", "", fmt.Sprintf("VieNeu lỗi chunk %d (status %d)", i, resp.StatusCode))
+		if err != nil {
+			log.Printf("TTS job %d chunk %d read: %v", jobID, i, err)
+			_ = models.UpdateJob(jobID, "failed", "", fmt.Sprintf("VieNeu ngắt kết nối ở đoạn %d: %v", i, err))
+			return
+		}
+		if resp.StatusCode != 200 {
+			_ = models.UpdateJob(jobID, "failed", "", fmt.Sprintf("VieNeu lỗi đoạn %d (status %d)", i, resp.StatusCode))
+			return
+		}
+		// Lỗi infer phía VieNeu vẫn trả 200 nhưng chỉ có header WAV (44 byte).
+		if len(wavBytes) <= 44 {
+			_ = models.UpdateJob(jobID, "failed", "", fmt.Sprintf("VieNeu không tạo được audio ở đoạn %d (xem log vieneu)", i))
 			return
 		}
 

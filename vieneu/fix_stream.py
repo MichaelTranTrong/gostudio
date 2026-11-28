@@ -5,6 +5,8 @@
    (lookback/lookforward) -> đôi khi nhân đôi đoạn audio, nghe thành
    LẶP CHỮ. infer() sinh 1 lần rồi decode nên không có lỗi ghép này.
    Kèm hạ temperature=0.7, top_k=30 để giảm lấy mẫu chệch vào vòng lặp.
+   max_chars=160 (gốc 256): đoạn ~250 ký tự khiến model không biết dừng,
+   đọc lặp tới sát giới hạn context (nhất là câu liệt kê dài).
    (Dùng regex vì upstream hay đổi khoảng trắng khiến khớp nguyên khối hỏng.)
 
 2. standard.py: bật use_chat_format cho mọi model VieNeu-TTS.
@@ -20,6 +22,15 @@
 4. standard.py: thêm repeat_penalty=1.3 vào lệnh sinh GGUF
    (_infer_ggml + _infer_stream_ggml). Model tự hồi quy đôi khi kẹt
    vòng lặp -> lặp cụm từ; lệnh sinh gốc không truyền repeat_penalty.
+
+5. standard.py: chốt chặn đoạn bị chạy lan man. Giới hạn max_tokens theo
+   độ dài phoneme (đọc bình thường ~1.8-2.7 token/ký tự phoneme); chạm
+   trần nghĩa là bị lặp -> sinh lại, tối đa 3 lần.
+
+6. web_stream.py: khóa (threading.Lock) để infer chạy TUẦN TỰ. FastAPI chạy
+   generator trong threadpool; 2 request cùng lúc dùng chung 1 context
+   llama.cpp -> "llama_decode returned -1" rồi GGML_ASSERT (repack.cpp)
+   làm crash container. Lỗi infer -> xóa KV cache để request sau không hỏng.
 """
 
 import re
@@ -32,17 +43,39 @@ c1 = open(p1).read()
 pat1 = re.compile(r"        start = time\.time\(\).*?        except Exception as e:", re.S)
 new1 = (
     "        try:\n"
-    "            wav = tts.infer(text, voice=voice_data, temperature=0.7, top_k=30)\n"
+    "            with _infer_lock:\n"
+    "                wav = tts.infer(text, voice=voice_data, temperature=0.7, top_k=30, max_chars=160)\n"
     "            yield float32_to_pcm16(wav)\n"
-    "        except Exception as e:"
+    "        except Exception as e:\n"
+    "            _reset_backbone()"
 )
 
 c1_new, n1 = pat1.subn(new1, c1)
 if n1:
+    # Patch 6: 1 model llama.cpp dùng chung -> 2 request chạy song song (threadpool
+    # của FastAPI) làm hỏng KV cache: "llama_decode returned -1" rồi GGML_ASSERT
+    # repack.cpp -> crash container. Khóa để infer chạy tuần tự; lỗi thì xóa KV.
+    helpers = (
+        "import threading\n"
+        "_infer_lock = threading.Lock()\n\n"
+        "def _reset_backbone():\n"
+        "    try:\n"
+        "        b = tts.backbone\n"
+        "        b._ctx.kv_cache_clear()\n"
+        "        b.reset()\n"
+        "        print('🔄 Cleared llama KV cache after error', flush=True)\n"
+        "    except Exception as re_err:\n"
+        "        print(f'⚠️ Could not reset backbone: {re_err}', flush=True)\n\n"
+    )
+    anchor = "def float32_to_pcm16("
+    if anchor not in c1_new:
+        raise SystemExit('ERROR: web_stream.py float32_to_pcm16 anchor not found')
+    c1_new = c1_new.replace(anchor, helpers + anchor, 1)
     open(p1, 'w').write(c1_new)
     print(f'Patched web_stream.py: infer_stream -> infer ({n1} site)')
 else:
-    print('WARN: web_stream.py infer_stream pattern not found')
+    # Không có patch 1 thì cũng không có khóa (patch 6) -> dừng build.
+    raise SystemExit('ERROR: web_stream.py infer_stream pattern not found')
 
 # ── Patch 2: standard.py ──────────────────────────────────────
 p2 = '/app/src/vieneu/standard.py'
@@ -97,3 +130,28 @@ if old4 in c2b:
     print('Patched standard.py: added repeat_penalty=1.3 to GGUF generation')
 else:
     print('WARN: standard.py repeat_penalty pattern not found')
+
+# ── Patch 5: standard.py — chốt chặn sinh lan man + đọc lại ───
+# Chỉ áp cho _infer_ggml (đường app dùng). Lỗi pattern -> dừng build,
+# tránh hỏng âm thầm như patch 1 trước đây.
+c2c = open(p2).read()
+
+old5 = '''        output = self.backbone(prompt, max_tokens=self.max_context, temperature=temperature, top_k=top_k, repeat_penalty=1.3, stop=["<|SPEECH_GENERATION_END|>"])
+        return output["choices"][0]["text"]'''
+
+new5 = '''        limit = int(len(chunk_phonemes) * 3.2) + 100
+        best = None
+        for attempt in range(3):
+            output = self.backbone(prompt, max_tokens=limit, temperature=temperature, top_k=top_k, repeat_penalty=1.3, stop=["<|SPEECH_GENERATION_END|>"])
+            choice = output["choices"][0]
+            if choice.get("finish_reason") != "length":
+                return choice["text"]
+            print(f"⚠️ Runaway speech (attempt {attempt + 1}/3, limit {limit} tokens): {chunk_phonemes[:60]}", flush=True)
+            if best is None or len(choice["text"]) < len(best):
+                best = choice["text"]
+        return best'''
+
+if old5 not in c2c:
+    raise SystemExit('ERROR: standard.py runaway-guard pattern not found')
+open(p2, 'w').write(c2c.replace(old5, new5))
+print('Patched standard.py: runaway guard + retry')
