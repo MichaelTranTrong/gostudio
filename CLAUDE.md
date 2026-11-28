@@ -293,6 +293,12 @@ gh release create v1.0.0 --title "Go Studio v1.0.0" --notes "..."
 - **Chưa hết hẳn**: người dùng nghe lại vẫn thấy "chưa ổn lắm" — xem mục "Đang làm"
 - Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.7
 
+### 35. v1.7.8 — TTS: nhớ giọng đọc đang dùng
+- Trước đây mỗi lần load trang (hoặc chuyển tab rồi quay lại — `loadVoices()` chạy lại mỗi lần mở tab) dropdown giọng về lại giọng đầu (Ngọc Huyền)
+- Giờ đổi giọng → lưu `localStorage['gostudio_tts_voice']`; `loadVoices()` khôi phục nếu giọng đó còn trong danh sách, không thì dùng mặc định. Đọc/ghi bọc `try/catch`
+- Nhớ theo từng trình duyệt (không lưu DB). Chỉ sửa `web/static/js/app.js`
+- Release: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.8
+
 ### 9. Lệnh release GitHub
 ```bash
 git add .
@@ -365,7 +371,7 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
   - **Go Keep KHÔNG bị đụng:** `gokeep_mysql` (Up 3 tháng, healthy) + `gokeep_app` + network `gokeep_default` là external, không do compose gostudio quản lý → `down -v` không xóa. Bảng `users` dùng chung nằm trong DB Go Keep, còn nguyên.
   - **Code auth vẫn còn nguyên trong repo** (feature flag `AUTH_ENABLED`, `docker-compose.vps.yml`) → khi có server mạnh, re-deploy lại nhanh: dựng lại `.env` (hoặc dùng backup) + chạy lệnh compose VPS. TODO lúc đó: build `vieneu` (TTS) — trước bị chặn vì disk/RAM; NPM proxy cần `client_max_body_size 1024m;` (tab Advanced) cho upload video lớn.
 - Repo public: https://github.com/MichaelTranTrong/gostudio
-- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.7
+- Release mới nhất: https://github.com/MichaelTranTrong/gostudio/releases/tag/v1.7.8
 
 ---
 
@@ -434,3 +440,4 @@ gh release create v1.x.x --title "Go Studio v1.x.x" --notes "..."
 | v1.7.5 | Tùy chọn giữ app GoStudio Capture mở để chụp/quay tiếp nhiều lần (mặc định tắt) |
 | v1.7.6 | Sửa TTS không hoạt động: container `vieneu` crash-loop do `uv run` sync lại lock trỏ tới wheel đã bị xóa (`--frozen` + `--no-sync`) |
 | v1.7.7 | TTS: chống đọc lặp kéo dài (`max_chars=160` + chốt chặn `max_tokens`/đọc lại), khóa infer tuần tự chống crash, timeout 30 phút (chưa hết hẳn lặp) |
+| v1.7.8 | TTS: nhớ giọng đọc đang dùng (localStorage), load lại trang không về giọng mặc định |

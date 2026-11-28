@@ -325,6 +325,16 @@ ttsText.addEventListener('input', () => {
   charCount.style.color = len > 2800 ? 'var(--accent2)' : '';
 });
 
+// Ghi nhớ giọng đọc đang dùng (localStorage) → load lại trang không về giọng mặc định.
+const VOICE_KEY = 'gostudio_tts_voice';
+function getSavedVoice() {
+  try { return localStorage.getItem(VOICE_KEY); } catch { return null; }
+}
+voiceSelect.addEventListener('change', () => {
+  if (!voiceSelect.value) return;
+  try { localStorage.setItem(VOICE_KEY, voiceSelect.value); } catch {}
+});
+
 async function loadVoices() {
   voiceSelect.innerHTML = '<option value="">Đang tải…</option>';
   ttsSubmitBtn.disabled = true;
@@ -336,6 +346,9 @@ async function loadVoices() {
     voiceSelect.innerHTML = voices.map(v =>
       `<option value="${v.id}">${v.name}</option>`
     ).join('');
+    // Khôi phục giọng đã chọn lần trước (nếu giọng đó vẫn còn trong danh sách).
+    const saved = getSavedVoice();
+    if (saved && voices.some(v => v.id === saved)) voiceSelect.value = saved;
     ttsSubmitBtn.disabled = ttsText.value.trim() === '';
   } catch {
     voiceSelect.innerHTML = '<option value="">VieNeu chưa sẵn sàng — thử lại sau</option>';
